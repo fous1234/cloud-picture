@@ -1,0 +1,9 @@
+# 生产环境差异配置；数据库、Redis、COS 等连接信息仍由环境变量提供
+spring:
+  flyway:
+    # 生产库不做自动 baseline，避免在结构未知的库上静默打标
+    baseline-on-migrate: false
+
+logging:
+  level:
+    com.example.cloudpicture: info

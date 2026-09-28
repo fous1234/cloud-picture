@@ -1,0 +1,49 @@
+server:
+  port: ${USER_SERVICE_PORT:8081}
+
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
+  # 本地开发读取项目根目录的 .env（IDEA 与命令行都不必再配环境变量）；正式环境用真实环境变量，优先级高于该文件
+  config:
+    import: "optional:file:./.env[.properties],optional:file:../.env[.properties]"
+  application:
+    name: picture-user-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${USER_MYSQL_HOST:127.0.0.1}:${USER_MYSQL_PORT:3306}/${USER_MYSQL_DATABASE:picture_user}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${USER_MYSQL_USERNAME:root}
+    password: ${USER_MYSQL_PASSWORD:}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: isDelete
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+picture:
+  session:
+    ttl-seconds: ${SESSION_TTL_SECONDS:604800}
+  auth:
+    # 免登录请求白名单，格式为 "METHOD /path"，多个用逗号分隔
+    public-requests: "POST /auth/register,POST /auth/login"
+  internal:
+    # 服务间内部接口令牌，图片服务通过 Feign 携带 X-Internal-Token 调用
+    token: ${INTERNAL_TOKEN:}

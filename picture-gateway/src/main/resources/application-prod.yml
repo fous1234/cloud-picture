@@ -1,0 +1,4 @@
+# 生产环境差异配置；路由、Nacos 地址等仍由环境变量提供
+logging:
+  level:
+    com.example.cloudpicture: info
