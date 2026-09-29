@@ -395,6 +395,55 @@ const emptyText = computed(() =>
   flex: 0 0 145px;
 }
 
+@media (min-width: 768px) {
+  .hero-search-row {
+    align-items: center;
+  }
+
+  .hero-category :deep(.ant-select-selector),
+  .hero-search :deep(.ant-input-affix-wrapper) {
+    height: 50px;
+    box-sizing: border-box;
+  }
+
+  .hero-category :deep(.ant-select-selection-item),
+  .hero-category :deep(.ant-select-selection-placeholder) {
+    line-height: 48px;
+  }
+
+  .hero-search :deep(.ant-input-suffix .ant-btn) {
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    min-height: auto;
+    padding-top: 30px;
+    padding-bottom: 28px;
+  }
+
+  .hero-art {
+    display: none;
+  }
+
+  .hero-search-row {
+    width: 100%;
+    max-width: 760px;
+    flex-wrap: wrap;
+  }
+
+  .hero-category,
+  .hero-search {
+    width: 100%;
+    flex-basis: 100%;
+  }
+}
+
 .hero-search :deep(.ant-input-affix-wrapper) {
   border: 0;
   box-shadow: none;

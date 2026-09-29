@@ -13,10 +13,6 @@ import { uploadOpen } from '../stores/ui'
     <main class="layout-main">
       <RouterView />
     </main>
-    <footer class="layout-footer">
-      <div class="cp-container">云图库 · 毕业设计演示项目</div>
-    </footer>
-
     <UploadModal v-model:open="uploadOpen" />
     <ImageEditModal />
     <ReviewModal />
@@ -34,17 +30,4 @@ import { uploadOpen } from '../stores/ui'
   flex: 1;
 }
 
-.layout-footer {
-  padding: 24px 0;
-  border-top: 1px solid var(--cp-border);
-  color: var(--cp-text-soft);
-  font-size: 12px;
-  text-align: center;
-}
-
-@media (max-width: 767px) {
-  .layout-footer {
-    display: none;
-  }
-}
 </style>
