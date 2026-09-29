@@ -1,0 +1,137 @@
+:root {
+  --cp-bg: #f5f6f8;
+  --cp-bg-soft: #fafafa;
+  --cp-surface: #ffffff;
+  --cp-border: #e7e8eb;
+  --cp-text: #17191c;
+  --cp-text-soft: #717780;
+  --cp-accent: #111827;
+  --cp-radius: 12px;
+  --cp-header-height: 68px;
+  --cp-container: 1280px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--cp-bg);
+  color: var(--cp-text);
+  font-family: Inter, 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 键盘可达的焦点反馈 */
+:focus-visible {
+  outline: 2px solid var(--cp-accent);
+  outline-offset: 2px;
+}
+
+.cp-container {
+  width: 100%;
+  max-width: var(--cp-container);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.cp-page {
+  padding: 24px 0 64px;
+}
+
+.cp-page-title {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.cp-page-subtitle {
+  margin: 0;
+  color: var(--cp-text-soft);
+}
+
+.cp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.cp-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+/* 瀑布流：不同高宽比的卡片按列排布，避免统一裁切 */
+.cp-masonry {
+  column-gap: 16px;
+  columns: 4;
+}
+
+.cp-masonry > * {
+  break-inside: avoid;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1199px) {
+  .cp-masonry {
+    columns: 3;
+  }
+}
+
+@media (max-width: 899px) {
+  .cp-masonry {
+    columns: 2;
+  }
+}
+
+@media (max-width: 575px) {
+  .cp-masonry {
+    columns: 2;
+    column-gap: 12px;
+  }
+}
+
+@media (max-width: 340px) {
+  .cp-masonry {
+    columns: 1;
+  }
+}
+
+.cp-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 767px) {
+  .layout-main {
+    padding-bottom: 72px;
+  }
+
+  .cp-container {
+    padding: 0 16px;
+  }
+
+  .cp-page-title {
+    font-size: 20px;
+  }
+}
