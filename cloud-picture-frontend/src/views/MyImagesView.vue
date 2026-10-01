@@ -6,7 +6,7 @@ import type { ImageVO, ReviewStatus } from '../api/types'
 import { listMyImages } from '../api/image'
 import { errorMessage } from '../api/http'
 import ImageGrid from '../components/ImageGrid.vue'
-import { dataVersion, openUpload } from '../stores/ui'
+import { dataVersion, openPexelsImport, openUpload } from '../stores/ui'
 import { isAdmin } from '../stores/session'
 import { confirmDeleteImage } from '../utils/imageActions'
 
@@ -100,6 +100,7 @@ const emptyText = computed(() =>
           {{ isAdmin() ? '查看本人上传的图片，维护图片信息，删除不再需要的图片' : '查看审核状态、维护图片信息，删除不再需要的图片' }}
         </p>
       </div>
+      <Button v-if="isAdmin()" type="primary" @click="openPexelsImport">从 Pexels 导入</Button>
     </div>
 
     <div class="cp-toolbar">
@@ -132,7 +133,7 @@ const emptyText = computed(() =>
           @delete="(image) => confirmDeleteImage(image, load)"
         >
           <template #empty-action>
-            <Button type="primary" @click="openUpload">上传图片</Button>
+          <Button type="primary" @click="openUpload">上传图片</Button>
           </template>
         </ImageGrid>
       </div>
@@ -156,7 +157,7 @@ const emptyText = computed(() =>
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
 
 .section-kicker {
@@ -178,12 +179,30 @@ const emptyText = computed(() =>
 
 .my-upload-grid :deep(.cp-masonry) {
   columns: 3;
-  column-gap: 18px;
+  column-gap: 16px;
+}
+
+.my-upload-grid :deep(.card-with-status) {
+  background: var(--cp-surface);
+  border-color: var(--cp-border);
+  border-radius: var(--cp-radius-lg);
+}
+
+.my-upload-grid :deep(.card-with-status .card-media) {
+  border-radius: var(--cp-radius-lg) var(--cp-radius-lg) 0 0;
+}
+
+.my-upload-grid :deep(.card-with-status .card-body) {
+  padding: 14px 16px 16px;
 }
 
 @media (max-width: 575px) {
   .page-head {
     flex-direction: column;
+  }
+
+  .page-head > .ant-btn {
+    width: 100%;
   }
 
   .my-upload-grid :deep(.cp-masonry) {

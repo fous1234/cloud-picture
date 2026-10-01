@@ -101,10 +101,11 @@ async function submit() {
 .review-preview {
   display: flex;
   gap: 12px;
-  padding: 10px;
+  padding: 12px;
   margin-bottom: 16px;
   border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius);
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-bg-soft);
 }
 
 .review-preview img {
@@ -131,5 +132,9 @@ async function submit() {
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 6px;
+}
+
+.review-tags :deep(.ant-tag) {
+  margin-inline-end: 0;
 }
 </style>

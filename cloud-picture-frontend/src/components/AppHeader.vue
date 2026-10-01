@@ -30,7 +30,7 @@ watch(
 )
 
 const navLinks = computed(() => {
-  const links = [{ name: 'gallery', label: '共享图库' }]
+  const links = [{ name: 'gallery', label: '图库' }]
   if (isAdmin()) {
     links.push({ name: 'admin-images', label: '图片审核' })
     links.push({ name: 'admin-users', label: '用户管理' })
@@ -66,7 +66,7 @@ async function handleLogout() {
     <header class="header">
     <div class="cp-container header-inner">
       <RouterLink :to="{ name: 'gallery' }" class="brand" aria-label="云图库首页">
-        <img class="brand-logo" src="/assets/cloud-picture-logo.svg" alt="云图库" />
+        <img class="brand-logo" src="/assets/cloud-picture-logo-stitch.png" alt="云图库" />
       </RouterLink>
 
       <div class="header-search">
@@ -99,7 +99,10 @@ async function handleLogout() {
               <Avatar :src="session.user?.avatar || undefined" :size="28">
                 {{ (session.user?.name || session.user?.account || 'U').slice(0, 1) }}
               </Avatar>
-              <span class="user-name">{{ session.user?.name || session.user?.account }}</span>
+              <span class="user-copy">
+                <span class="user-name">{{ session.user?.name || session.user?.account }}</span>
+                <span v-if="isAdmin()" class="user-role">(管理员)</span>
+              </span>
               <DownOutlined class="user-caret" />
             </button>
             <template #overlay>
@@ -171,9 +174,13 @@ async function handleLogout() {
     <nav v-if="isLoggedIn()" class="mobile-tabbar" aria-label="移动端导航">
       <RouterLink :to="{ name: 'gallery' }" class="mobile-tab">
         <AppstoreOutlined />
-        <span>共享图库</span>
+        <span>图库</span>
       </RouterLink>
-      <RouterLink :to="{ name: 'my-images' }" class="mobile-tab">
+      <RouterLink v-if="isAdmin()" :to="{ name: 'admin-images' }" class="mobile-tab">
+        <PictureOutlined />
+        <span>审核</span>
+      </RouterLink>
+      <RouterLink v-else :to="{ name: 'my-images' }" class="mobile-tab">
         <PictureOutlined />
         <span>我的上传</span>
       </RouterLink>
@@ -194,15 +201,15 @@ async function handleLogout() {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--cp-border);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--cp-border-subtle);
 }
 
 .header-inner {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 24px;
   height: var(--cp-header-height);
 }
 
@@ -219,19 +226,19 @@ async function handleLogout() {
 }
 
 .header-search {
-  flex: 1;
-  max-width: 420px;
+  display: none;
 }
 
 .header-nav {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 22px;
   margin-left: auto;
 }
 
 .nav-link {
   color: var(--cp-text-soft);
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -248,7 +255,7 @@ async function handleLogout() {
 .nav-link.router-link-active::after {
   position: absolute;
   right: 0;
-  bottom: -22px;
+  bottom: -19px;
   left: 0;
   height: 2px;
   background: var(--cp-accent);
@@ -256,6 +263,10 @@ async function handleLogout() {
 }
 
 .upload-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -263,7 +274,7 @@ async function handleLogout() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px;
+  padding: 4px 0 4px 4px;
   border: none;
   border-radius: 999px;
   background: transparent;
@@ -275,11 +286,24 @@ async function handleLogout() {
   background: var(--cp-bg-soft);
 }
 
-.user-name {
+.user-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
   max-width: 120px;
+}
+
+.user-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12px;
+}
+
+.user-role {
+  color: var(--cp-text-muted);
+  font-size: 10px;
 }
 
 .user-caret {
@@ -320,10 +344,6 @@ async function handleLogout() {
 }
 
 @media (max-width: 991px) {
-  .header-search {
-    display: none;
-  }
-
   .header-nav {
     display: flex;
     gap: 0;
@@ -406,7 +426,7 @@ async function handleLogout() {
     gap: 8px;
   }
 
-  .user-name,
+  .user-copy,
   .user-caret {
     display: none;
   }

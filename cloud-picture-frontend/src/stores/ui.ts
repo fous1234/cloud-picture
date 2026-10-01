@@ -4,6 +4,9 @@ import type { ImageVO, ReviewStatus, UserBrief, UserStatus } from '../api/types'
 /** 上传弹窗由导航打开，弹窗本身挂在共享布局上 */
 export const uploadOpen = ref(false)
 
+/** Pexels 导入弹窗由管理员入口打开，弹窗挂在共享布局上 */
+export const pexelsImportOpen = ref(false)
+
 /** 图片信息编辑弹窗（图库、详情、我的上传共用） */
 export const editingImage = ref<ImageVO | null>(null)
 
@@ -21,6 +24,10 @@ export function bumpData() {
 
 export function openUpload() {
   uploadOpen.value = true
+}
+
+export function openPexelsImport() {
+  pexelsImportOpen.value = true
 }
 
 export function openEdit(image: ImageVO) {
@@ -51,7 +58,7 @@ export const REVIEW_STATUS_TEXT: Record<ReviewStatus, string> = {
 }
 
 export const REVIEW_STATUS_COLOR: Record<ReviewStatus, string> = {
-  0: 'processing',
+  0: 'warning',
   1: 'success',
   2: 'error',
 }

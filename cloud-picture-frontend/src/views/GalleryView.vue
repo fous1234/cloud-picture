@@ -286,13 +286,31 @@ const emptyText = computed(() =>
 
     <main class="cp-container cp-page gallery-content">
       <div v-if="showSearchResults" class="search-results-head">
-        <p class="section-kicker">SEARCH RESULTS</p>
-        <h1 class="cp-page-title">
-          {{ hasFilters ? `“${filters.q || filters.category || filters.tag}” 的搜索结果` : '搜索结果' }}
-        </h1>
-        <p class="cp-page-subtitle">
-          {{ hasFilters ? '浏览符合条件的共享图片' : '浏览全部共享图片' }}
-        </p>
+        <div class="search-results-copy">
+          <p class="section-kicker">SEARCH RESULTS</p>
+          <h1 class="cp-page-title">
+            {{ hasFilters ? `“${filters.q || filters.category || filters.tag}” 的搜索结果` : '搜索结果' }}
+          </h1>
+          <p class="cp-page-subtitle">
+            {{ hasFilters ? '浏览符合条件的共享图片' : '浏览全部共享图片' }}
+          </p>
+        </div>
+        <Input
+          v-model:value="keyword"
+          size="large"
+          class="results-search"
+          placeholder="输入关键词、场景或标签搜索摄影作品..."
+          allow-clear
+          @press-enter="submitSearch"
+        >
+          <template #prefix><SearchOutlined /></template>
+          <template #suffix>
+            <Button type="primary" @click="submitSearch">
+              <template #icon><SearchOutlined /></template>
+              搜索
+            </Button>
+          </template>
+        </Input>
       </div>
 
       <div v-else class="gallery-section-head">
@@ -304,13 +322,19 @@ const emptyText = computed(() =>
       </div>
 
       <div v-if="!showSearchResults" class="category-strip" aria-label="图片分类">
-        <button class="category-chip category-chip-active" type="button" @click="showGalleryHome">
+        <button
+          class="category-chip"
+          :class="{ 'category-chip-active': !filters.category }"
+          type="button"
+          @click="showGalleryHome"
+        >
           全部作品
         </button>
         <button
           v-for="option in CATEGORY_OPTIONS"
           :key="String(option.value)"
           class="category-chip"
+          :class="{ 'category-chip-active': filters.category === option.value }"
           type="button"
           @click="setCategory(option.value)"
         >
@@ -407,17 +431,18 @@ const emptyText = computed(() =>
 <style scoped>
 .hero {
   overflow: hidden;
-  background: #f0f2f4;
+  background: var(--cp-bg);
+  border-bottom: 1px solid var(--cp-border-subtle);
 }
 
 .hero-inner {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
   align-items: center;
-  gap: 40px;
-  min-height: 390px;
-  padding-top: 36px;
-  padding-bottom: 36px;
+  gap: 56px;
+  min-height: 360px;
+  padding-top: 42px;
+  padding-bottom: 42px;
 }
 
 .hero-copy {
@@ -442,12 +467,13 @@ const emptyText = computed(() =>
 }
 
 .hero-title {
-  max-width: 610px;
+  max-width: 620px;
   margin: 0;
-  font-size: clamp(36px, 4vw, 54px);
-  font-weight: 650;
-  line-height: 1.18;
-  letter-spacing: -0.045em;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: clamp(34px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
 }
 
 .hero-subtitle {
@@ -463,13 +489,13 @@ const emptyText = computed(() =>
 
 .hero-search-row {
   display: flex;
-  gap: 8px;
-  max-width: 620px;
-  padding: 7px;
-  border: 1px solid #e1e3e6;
-  border-radius: 12px;
+  gap: 6px;
+  max-width: 640px;
+  padding: 4px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
   background: #fff;
-  box-shadow: 0 8px 28px rgba(20, 27, 36, 0.06);
+  box-shadow: 0 8px 28px rgba(17, 24, 39, 0.04);
 }
 
 .hero-category {
@@ -483,12 +509,12 @@ const emptyText = computed(() =>
   }
 
   .hero-category :deep(.ant-select-selector) {
-    height: 50px;
+    height: 48px;
     box-sizing: border-box;
   }
 
   .hero-search {
-    height: 50px;
+    height: 48px;
     box-sizing: border-box;
     border: 0;
     box-shadow: none;
@@ -496,7 +522,7 @@ const emptyText = computed(() =>
 
   .hero-category :deep(.ant-select-selection-item),
   .hero-category :deep(.ant-select-selection-placeholder) {
-    line-height: 48px;
+    line-height: 46px;
   }
 
   .hero-search :deep(.ant-input-suffix .ant-btn) {
@@ -533,7 +559,7 @@ const emptyText = computed(() =>
 }
 
 .hero-search :deep(.ant-input-suffix) .ant-btn {
-  border-radius: 8px;
+  border-radius: var(--cp-radius);
 }
 
 .hero-hot-search {
@@ -564,8 +590,8 @@ const emptyText = computed(() =>
   position: absolute;
   display: block;
   border: 5px solid #fff;
-  border-radius: 10px;
-  box-shadow: 0 18px 42px rgba(26, 35, 43, 0.18);
+  border-radius: var(--cp-radius);
+  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.14);
   object-fit: cover;
 }
 
@@ -617,7 +643,7 @@ const emptyText = computed(() =>
 }
 
 .gallery-content {
-  padding-top: 30px;
+  padding-top: 36px;
   padding-bottom: 72px;
 }
 
@@ -630,8 +656,9 @@ const emptyText = computed(() =>
 
 .gallery-section-head h2 {
   margin: 0;
-  font-size: 23px;
-  font-weight: 650;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 22px;
+  font-weight: 600;
 }
 
 .gallery-section-head .section-kicker {
@@ -639,7 +666,26 @@ const emptyText = computed(() =>
 }
 
 .search-results-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
   margin-bottom: 20px;
+}
+
+.search-results-copy {
+  min-width: 0;
+}
+
+.results-search {
+  width: min(100%, 520px);
+  flex: 0 1 520px;
+  border-radius: var(--cp-radius);
+}
+
+.results-search :deep(.ant-input-affix-wrapper) {
+  border-color: var(--cp-border);
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
 }
 
 .search-results-head .cp-page-title {
@@ -662,10 +708,11 @@ const emptyText = computed(() =>
 
 .category-chip {
   flex: 0 0 auto;
-  padding: 8px 14px;
+  min-height: 34px;
+  padding: 6px 14px;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: #eceef1;
+  background: var(--cp-bg-soft);
   color: #535b64;
   cursor: pointer;
   font: inherit;
@@ -741,7 +788,7 @@ const emptyText = computed(() =>
 
   .hero-title {
     max-width: 390px;
-    font-size: 30px;
+    font-size: 28px;
   }
 
   .hero-subtitle {
@@ -788,6 +835,17 @@ const emptyText = computed(() =>
 
   .search-results-head .cp-page-title {
     font-size: 22px;
+  }
+
+  .search-results-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .results-search {
+    width: 100%;
+    flex-basis: auto;
   }
 
   .hero-category {

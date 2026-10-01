@@ -127,8 +127,8 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
 
 <style scoped>
 .card {
-  background: var(--cp-bg);
-  border-radius: var(--cp-radius);
+  background: transparent;
+  border-radius: var(--cp-radius-lg);
   overflow: hidden;
   border: 1px solid var(--cp-border);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
@@ -141,18 +141,19 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
 }
 
 .card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
 }
 
 .card-media {
   position: relative;
   display: block;
   background: var(--cp-bg-soft);
+  overflow: hidden;
+  border-radius: var(--cp-radius-lg);
 }
 
 .card:not(.card-with-status) .card-media {
-  overflow: hidden;
-  border-radius: 10px;
+  border-radius: var(--cp-radius-lg);
 }
 
 .card-media img {
@@ -176,10 +177,10 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
   inset: 0;
   display: flex;
   gap: 8px;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: flex-end;
   padding: 8px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), transparent 45%);
+  background: linear-gradient(to top, rgba(17, 24, 39, 0.68), transparent 55%);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -203,21 +204,27 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
 
 .card-status {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
+  top: 10px;
+  left: 10px;
   margin: 0;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .card-body {
-  padding: 10px 12px 14px;
+  padding: 12px 12px 14px;
 }
 
 .card:not(.card-with-status) .card-body {
-  padding: 9px 2px 12px;
+  padding: 10px 2px 12px;
 }
 
 .card-title {
   display: block;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 14px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -232,7 +239,7 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 6px;
+  margin-top: 7px;
   font-size: 12px;
   color: var(--cp-text-soft);
 }
@@ -262,6 +269,15 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
   margin-top: 8px;
 }
 
+.card-tags :deep(.ant-tag) {
+  margin-inline-end: 0;
+  padding: 2px 8px;
+  border-color: var(--cp-border-subtle);
+  background: var(--cp-bg-soft);
+  color: var(--cp-text-soft);
+  font-size: 11px;
+}
+
 .card-reason {
   margin: 8px 0 0;
   font-size: 12px;
@@ -282,7 +298,7 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
 @media (max-width: 575px) {
   .card:not(.card-with-status) {
     position: relative;
-    border-radius: 10px;
+    border-radius: var(--cp-radius-lg);
   }
 
   .card:not(.card-with-status) .card-body {
