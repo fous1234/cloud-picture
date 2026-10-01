@@ -209,6 +209,14 @@ function viewDetail() {
         >
           <Input v-model:value="form.name" placeholder="不填则使用文件名" :maxlength="256" />
         </FormItem>
+        <FormItem label="分类" name="category">
+          <AutoComplete
+            v-model:value="form.category"
+            :options="CATEGORY_OPTIONS"
+            placeholder="选择或输入分类"
+            allow-clear
+          />
+        </FormItem>
         <FormItem
           label="简介"
           name="introduction"
@@ -220,14 +228,6 @@ function viewDetail() {
             :maxlength="512"
             show-count
             placeholder="简单描述这张图片"
-          />
-        </FormItem>
-        <FormItem label="分类" name="category">
-          <AutoComplete
-            v-model:value="form.category"
-            :options="CATEGORY_OPTIONS"
-            placeholder="选择或输入分类"
-            allow-clear
           />
         </FormItem>
         <FormItem label="标签" name="tags">
@@ -276,16 +276,16 @@ function viewDetail() {
 }
 
 .dropzone {
-  border: 1px dashed var(--cp-border);
-  border-radius: var(--cp-radius);
+  border: 1.5px dashed #d1d5db;
+  border-radius: var(--cp-radius-lg);
   background: var(--cp-bg-soft);
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .dropzone-active {
   border-color: var(--cp-accent);
-  background: #f1f3f5;
+  background: var(--cp-bg-soft);
 }
 
 .dropzone:focus-within {
@@ -296,7 +296,9 @@ function viewDetail() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-height: 150px;
+  padding: 32px 16px;
   padding: 28px 16px;
   cursor: pointer;
   text-align: center;
@@ -316,15 +318,15 @@ function viewDetail() {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px;
-  margin-bottom: 16px;
+  padding: 12px;
+  margin-bottom: 20px;
   border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius);
+  border-radius: var(--cp-radius-lg);
 }
 
 .file-preview img {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   object-fit: cover;
   border-radius: 8px;
   background: var(--cp-bg-soft);
@@ -349,6 +351,19 @@ function viewDetail() {
 
 .upload-form {
   margin-bottom: 0;
+}
+
+.upload-form :deep(.ant-input),
+.upload-form :deep(.ant-input-affix-wrapper),
+.upload-form :deep(.ant-select-selector) {
+  border-color: var(--cp-border);
+  background: var(--cp-bg-soft);
+}
+
+.upload-form :deep(.ant-form-item-label > label) {
+  color: var(--cp-text);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .upload-error {

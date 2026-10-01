@@ -64,7 +64,7 @@ async function submit() {
     <section class="auth-main">
       <div class="auth-card">
         <div class="auth-mobile-brand">
-          <img src="/assets/cloud-picture-logo.svg" alt="云图库" />
+          <img src="/assets/cloud-picture-logo-stitch.png" alt="云图库" />
         </div>
         <h2 class="auth-title">欢迎回来</h2>
         <p class="auth-subtitle">请登录您的账号以访问共享图库</p>
@@ -120,6 +120,7 @@ async function submit() {
           还没有账号？
           <RouterLink :to="{ name: 'register' }">立即注册</RouterLink>
         </p>
+        <p class="auth-footer">SECURED UNIVERSITY PHOTOGRAPHY VAULT · VER 2.4</p>
       </div>
     </section>
   </div>
@@ -137,7 +138,7 @@ async function submit() {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 40px 56px 32px;
+  padding: 32px 48px 28px;
   background-image: linear-gradient(180deg, rgba(11, 14, 17, 0.18), rgba(11, 14, 17, 0.66)),
     url('/assets/auth-campus.jpg');
   background-position: center;
@@ -195,29 +196,31 @@ async function submit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 56px 40px;
-  background: #fff;
+  padding: 48px 40px;
+  background: var(--cp-surface);
 }
 
 .auth-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 360px;
 }
 
 .auth-mobile-brand {
-  margin-bottom: 36px;
+  margin-bottom: 28px;
 }
 
 .auth-mobile-brand img {
   display: block;
-  width: 128px;
-  height: 32px;
+  width: 112px;
+  height: 28px;
 }
 
 .auth-title {
   margin: 0;
-  font-size: 28px;
-  font-weight: 650;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
@@ -240,6 +243,14 @@ async function submit() {
   font-weight: 600;
 }
 
+.auth-footer {
+  margin: 36px 0 0;
+  color: var(--cp-text-muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
 .auth-card :deep(.ant-form-item-label > label) {
   font-size: 13px;
   font-weight: 600;
@@ -247,14 +258,15 @@ async function submit() {
 
 .auth-card :deep(.ant-input-affix-wrapper),
 .auth-card :deep(.ant-input) {
-  min-height: 48px;
-  border-color: #e7e8eb;
-  background: #f7f8fa;
+  min-height: 46px;
+  border-color: var(--cp-border);
+  background: var(--cp-bg-soft);
 }
 
 .auth-card :deep(.ant-btn-lg) {
-  height: 48px;
-  margin-top: 8px;
+  height: 46px;
+  margin-top: 10px;
+  border-radius: var(--cp-radius);
 }
 
 @media (max-width: 899px) {
@@ -278,7 +290,7 @@ async function submit() {
   }
 
   .auth-mobile-brand {
-    margin-bottom: 48px;
+    margin-bottom: 40px;
   }
 }
 </style>

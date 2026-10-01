@@ -97,3 +97,17 @@ async function submit() {
     </template>
   </Modal>
 </template>
+
+<style scoped>
+.ant-form :deep(.ant-input),
+.ant-form :deep(.ant-input-affix-wrapper),
+.ant-form :deep(.ant-select-selector) {
+  border-color: var(--cp-border);
+  background: var(--cp-bg-soft);
+}
+
+.ant-form :deep(.ant-form-item-label > label) {
+  font-size: 12px;
+  font-weight: 600;
+}
+</style>

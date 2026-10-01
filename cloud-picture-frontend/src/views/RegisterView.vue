@@ -65,7 +65,7 @@ async function submit() {
     <section class="auth-main">
       <div class="auth-card">
         <div class="auth-mobile-brand">
-          <img src="/assets/cloud-picture-logo.svg" alt="云图库" />
+          <img src="/assets/cloud-picture-logo-stitch.png" alt="云图库" />
         </div>
         <h2 class="auth-title">创建团队账号</h2>
         <p class="auth-subtitle">加入校园共享图库，开启影像上传与灵感探索</p>
@@ -94,6 +94,18 @@ async function submit() {
               size="large"
               placeholder="4-32 位字母、数字或下划线"
               autocomplete="username"
+            />
+          </FormItem>
+          <FormItem
+            label="展示昵称"
+            name="userName"
+            :rules="[{ max: 32, message: '昵称长度不能超过 32' }]"
+          >
+            <Input
+              v-model:value="form.userName"
+              size="large"
+              placeholder="例如：林同学 / 摄影社成员"
+              :maxlength="32"
             />
           </FormItem>
           <FormItem
@@ -132,18 +144,6 @@ async function submit() {
               autocomplete="new-password"
             />
           </FormItem>
-          <FormItem
-            label="昵称"
-            name="userName"
-            :rules="[{ max: 32, message: '昵称长度不能超过 32' }]"
-          >
-            <Input
-              v-model:value="form.userName"
-              size="large"
-              placeholder="选填，默认使用账号"
-              :maxlength="32"
-            />
-          </FormItem>
           <Button type="primary" size="large" block :loading="submitting" html-type="submit">
             {{ submitting ? '注册中' : '注册' }}
           </Button>
@@ -153,6 +153,7 @@ async function submit() {
           已有账号？
           <RouterLink :to="{ name: 'login' }">返回登录</RouterLink>
         </p>
+        <p class="auth-footer">SECURED CAMPUS SSO COMPLIANT · © 2025 CLOUD GALLERY</p>
       </div>
     </section>
   </div>
@@ -170,7 +171,7 @@ async function submit() {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 40px 56px 32px;
+  padding: 32px 48px 28px;
   background-image: linear-gradient(180deg, rgba(11, 14, 17, 0.18), rgba(11, 14, 17, 0.66)),
     url('/assets/auth-campus.jpg');
   background-position: center;
@@ -228,29 +229,31 @@ async function submit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 56px 40px;
-  background: #fff;
+  padding: 48px 40px;
+  background: var(--cp-surface);
 }
 
 .auth-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 360px;
 }
 
 .auth-mobile-brand {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .auth-mobile-brand img {
   display: block;
-  width: 128px;
-  height: 32px;
+  width: 112px;
+  height: 28px;
 }
 
 .auth-title {
   margin: 0;
-  font-size: 28px;
-  font-weight: 650;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
@@ -273,6 +276,14 @@ async function submit() {
   font-weight: 600;
 }
 
+.auth-footer {
+  margin: 30px 0 0;
+  color: var(--cp-text-muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
 .auth-card :deep(.ant-form-item-label > label) {
   font-size: 13px;
   font-weight: 600;
@@ -280,14 +291,15 @@ async function submit() {
 
 .auth-card :deep(.ant-input-affix-wrapper),
 .auth-card :deep(.ant-input) {
-  min-height: 48px;
-  border-color: #e7e8eb;
-  background: #f7f8fa;
+  min-height: 46px;
+  border-color: var(--cp-border);
+  background: var(--cp-bg-soft);
 }
 
 .auth-card :deep(.ant-btn-lg) {
-  height: 48px;
-  margin-top: 8px;
+  height: 46px;
+  margin-top: 10px;
+  border-radius: var(--cp-radius);
 }
 
 @media (max-width: 899px) {
@@ -311,7 +323,7 @@ async function submit() {
   }
 
   .auth-mobile-brand {
-    margin-bottom: 40px;
+    margin-bottom: 36px;
   }
 }
 </style>

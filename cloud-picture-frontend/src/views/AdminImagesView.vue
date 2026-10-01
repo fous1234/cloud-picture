@@ -2,33 +2,22 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Alert,
   Button,
-  Form,
-  FormItem,
   Input,
-  InputNumber,
-  Modal,
-  Pagination,
   RadioButton,
   RadioGroup,
   Skeleton,
   Tag,
-  message,
 } from 'ant-design-vue'
 import { DeleteOutlined, SafetyCertificateOutlined } from '@ant-design/icons-vue'
 import type { ImageVO, ReviewStatus } from '../api/types'
 import { listAdminImages } from '../api/admin-image'
-import { importPexelsImages } from '../api/pexels-import'
-import type { ImportResult } from '../api/pexels-import'
-import { ApiError, errorMessage } from '../api/http'
+import { errorMessage } from '../api/http'
 import ErrorState from '../components/ErrorState.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { dataVersion, openReview, REVIEW_STATUS_COLOR, REVIEW_STATUS_TEXT } from '../stores/ui'
-import { isAdmin } from '../stores/session'
 import { confirmDeleteImage } from '../utils/imageActions'
 import { formatDateTime, formatDimensions } from '../utils/format'
-import { normalizeTags, tagsTooLong } from '../utils/tags'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,21 +31,8 @@ const error = ref<string | null>(null)
 const nameInput = ref('')
 const tagInput = ref('')
 const selectedImageId = ref<string | null>(null)
-const pexelsImportOpen = ref(false)
-const pexelsImportSubmitting = ref(false)
-const pexelsImportError = ref('')
-const pexelsImportWarning = ref(false)
-const pexelsImportResult = ref<ImportResult | null>(null)
-const pexelsImportFormRef = ref<{ validate: () => Promise<unknown> } | null>(null)
-const pexelsImportForm = ref({
-  keyword: '',
-  count: 5 as number | undefined,
-  category: '',
-  tags: [] as string[],
-})
 
 let requestSeq = 0
-let skipNextRouteLoad = false
 
 const STATUS_OPTIONS = [
   { value: '0', label: '待审核' },
@@ -79,6 +55,11 @@ function readQuery() {
 }
 
 const query = computed(() => readQuery())
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / query.value.size)))
+const queueTitle = computed(() => {
+  const selectedStatus = STATUS_OPTIONS.find((option) => option.value === query.value.status)
+  return `${selectedStatus?.label ?? '图片'}队列`
+})
 const selectedImage = computed(
   () => images.value.find((image) => image.id === selectedImageId.value) ?? images.value[0] ?? null,
 )
@@ -125,97 +106,6 @@ function pushQuery(patch: Record<string, string | number | undefined>) {
   return router.push({ name: 'admin-images', query: next })
 }
 
-function resetPexelsImport() {
-  pexelsImportForm.value = { keyword: '', count: 5, category: '', tags: [] }
-  pexelsImportError.value = ''
-  pexelsImportWarning.value = false
-  pexelsImportResult.value = null
-}
-
-function openPexelsImport() {
-  if (!pexelsImportSubmitting.value) resetPexelsImport()
-  pexelsImportOpen.value = true
-}
-
-function closePexelsImport() {
-  pexelsImportOpen.value = false
-  if (!pexelsImportSubmitting.value) resetPexelsImport()
-}
-
-async function refreshPassedImages() {
-  const current = readQuery()
-  if (current.status !== '1' || current.current !== 1) {
-    skipNextRouteLoad = true
-    try {
-      await pushQuery({ status: '1', current: 1 })
-      await load()
-    } finally {
-      skipNextRouteLoad = false
-    }
-    return
-  }
-  await load()
-}
-
-function importSummary(result: ImportResult) {
-  return `成功导入 ${result.imported} 张，跳过 ${result.skipped} 张，失败 ${result.failed} 张。`
-}
-
-async function submitPexelsImport() {
-  if (pexelsImportSubmitting.value || pexelsImportResult.value) return
-  pexelsImportError.value = ''
-  pexelsImportWarning.value = false
-  try {
-    await pexelsImportFormRef.value?.validate()
-  } catch {
-    return
-  }
-
-  const keyword = pexelsImportForm.value.keyword.trim()
-  const count = pexelsImportForm.value.count ?? 5
-  const tags = normalizeTags(pexelsImportForm.value.tags)
-  if (!tags.length) tags.push(keyword)
-  if (tagsTooLong(tags)) {
-    pexelsImportError.value = '标签总长度不能超过 512 个字符'
-    return
-  }
-
-  pexelsImportSubmitting.value = true
-  try {
-    const result = await importPexelsImages({
-      keyword,
-      count,
-      category: pexelsImportForm.value.category.trim() || undefined,
-      tags,
-    })
-    pexelsImportResult.value = result
-    await refreshPassedImages()
-    if (!pexelsImportOpen.value) message.success(`导入完成。${importSummary(result)}`)
-  } catch (e) {
-    if (e instanceof ApiError && e.code === 'NETWORK_ERROR') {
-      pexelsImportWarning.value = true
-      await refreshPassedImages()
-      if (!pexelsImportOpen.value) {
-        message.warning('导入耗时较长或网络中断，请先检查已通过列表中的结果，再决定是否重试。')
-      }
-    } else if (e instanceof ApiError && (e.code === 'PEXELS_ERROR' || e.status === 502)) {
-      pexelsImportError.value = 'Pexels 暂时不可用或配额不足，请稍后重试'
-    } else if (e instanceof ApiError && e.status === 401) {
-      return
-    } else if (e instanceof ApiError && e.status === 403) {
-      pexelsImportError.value = '没有导入权限'
-    } else if (e instanceof ApiError && e.status === 400) {
-      pexelsImportError.value = errorMessage(e)
-    } else {
-      pexelsImportError.value = '导入失败，请稍后重试'
-    }
-    if (!pexelsImportOpen.value && pexelsImportError.value) message.error(pexelsImportError.value)
-  } finally {
-    pexelsImportSubmitting.value = false
-    if (!pexelsImportOpen.value) resetPexelsImport()
-  }
-}
-
 function submitSearch() {
   pushQuery({
     name: nameInput.value.trim() || undefined,
@@ -234,7 +124,6 @@ watch(
     const parsed = readQuery()
     nameInput.value = parsed.name ?? ''
     tagInput.value = parsed.tag ?? ''
-    if (skipNextRouteLoad) return
     load()
   },
   { immediate: true },
@@ -276,7 +165,6 @@ const emptyText = '当前没有符合条件的图片'
         @press-enter="submitSearch"
       />
       <Button type="primary" @click="submitSearch">搜索</Button>
-      <Button v-if="isAdmin()" type="primary" @click="openPexelsImport">从 Pexels 导入</Button>
       <span class="toolbar-count">共 {{ total }} 张</span>
     </div>
 
@@ -291,9 +179,30 @@ const emptyText = '当前没有符合条件的图片'
         <div class="review-queue-heading">
           <div>
             <p class="section-kicker">SUBMISSIONS</p>
-            <h2>待审核队列</h2>
+            <h2>{{ queueTitle }}</h2>
           </div>
-          <span>{{ total }}</span>
+          <div class="review-queue-controls">
+            <span class="review-queue-count">{{ total }}</span>
+            <div class="review-queue-pagination" aria-label="审核队列分页">
+              <button
+                type="button"
+                class="review-queue-page-button"
+                aria-label="上一页"
+                :disabled="query.current <= 1"
+                @click="changePage(query.current - 1, query.size)"
+              >‹</button>
+              <span class="review-queue-page-label" aria-live="polite">
+                {{ query.current }} / {{ pageCount }}
+              </span>
+              <button
+                type="button"
+                class="review-queue-page-button"
+                aria-label="下一页"
+                :disabled="query.current >= pageCount"
+                @click="changePage(query.current + 1, query.size)"
+              >›</button>
+            </div>
+          </div>
         </div>
         <button
           v-for="image in images"
@@ -381,8 +290,21 @@ const emptyText = '当前没有符合条件的图片'
             拒绝理由：{{ selectedImage.reviewMessage }}
           </div>
           <div class="review-actions">
-            <Button type="primary" @click="openReview(selectedImage, 1)">通过并加入图库</Button>
-            <Button danger @click="openReview(selectedImage, 2)">拒绝审核</Button>
+            <Button
+              v-if="selectedImage.reviewStatus === 0"
+              type="primary"
+              @click="openReview(selectedImage, 1)"
+            >通过并加入图库</Button>
+            <Button
+              v-if="selectedImage.reviewStatus !== 2"
+              danger
+              @click="openReview(selectedImage, 2)"
+            >拒绝审核</Button>
+            <Button
+              v-else
+              type="primary"
+              @click="openReview(selectedImage, 1)"
+            >再次审核</Button>
             <Button @click="confirmDeleteImage(selectedImage, load)">
               <template #icon><DeleteOutlined /></template>
               删除图片
@@ -392,151 +314,16 @@ const emptyText = '当前没有符合条件的图片'
       </section>
     </div>
 
-    <div v-if="total > 0" class="cp-pagination">
-      <Pagination
-        :current="query.current"
-        :page-size="query.size"
-        :total="total"
-        show-less-items
-        @change="changePage"
-      />
-    </div>
-
-    <Modal
-      v-model:open="pexelsImportOpen"
-      title="从 Pexels 导入"
-      :width="600"
-      @cancel="closePexelsImport"
-    >
-      <template v-if="pexelsImportResult">
-        <div class="import-result-heading">导入完成</div>
-        <div class="import-result-stats">
-          <div><span>成功导入</span><strong>{{ pexelsImportResult.imported }}</strong></div>
-          <div><span>跳过</span><strong>{{ pexelsImportResult.skipped }}</strong></div>
-          <div :class="{ 'import-stat-failed': pexelsImportResult.failed > 0 }">
-            <span>失败</span><strong>{{ pexelsImportResult.failed }}</strong>
-          </div>
-        </div>
-        <Alert
-          v-if="pexelsImportResult.failed > 0"
-          class="import-result-message"
-          type="warning"
-          show-icon
-          :message="importSummary(pexelsImportResult)"
-          description="可以减少导入数量后重试。"
-        />
-        <Alert
-          v-else-if="pexelsImportResult.imported === 0 && pexelsImportResult.skipped > 0"
-          class="import-result-message"
-          type="info"
-          show-icon
-          message="这些图片已经导入过"
-        />
-        <p v-else class="import-result-message">{{ importSummary(pexelsImportResult) }}</p>
-      </template>
-
-      <template v-else>
-        <Form
-          ref="pexelsImportFormRef"
-          layout="vertical"
-          :model="pexelsImportForm"
-        >
-          <FormItem
-            label="关键词"
-            name="keyword"
-            :rules="[
-              { required: true, whitespace: true, message: '请输入搜索关键词' },
-              { max: 64, message: '关键词不能超过 64 个字符' },
-            ]"
-          >
-            <Input
-              v-model:value="pexelsImportForm.keyword"
-              :maxlength="64"
-              :disabled="pexelsImportSubmitting"
-              placeholder="例如：校园风景"
-            />
-          </FormItem>
-          <FormItem
-            label="导入数量"
-            name="count"
-            :rules="[
-              { required: true, type: 'number', message: '请输入导入数量' },
-              { type: 'number', min: 1, max: 10, message: '导入数量需在 1 到 10 之间' },
-            ]"
-          >
-            <InputNumber
-              v-model:value="pexelsImportForm.count"
-              :min="1"
-              :max="10"
-              :precision="0"
-              :disabled="pexelsImportSubmitting"
-              style="width: 100%"
-            />
-          </FormItem>
-          <FormItem
-            label="分类"
-            name="category"
-            :rules="[{ max: 64, message: '分类不能超过 64 个字符' }]"
-          >
-            <Input
-              v-model:value="pexelsImportForm.category"
-              :maxlength="64"
-              :disabled="pexelsImportSubmitting"
-              placeholder="可选"
-            />
-          </FormItem>
-          <FormItem label="标签" name="tags">
-            <Select
-              v-model:value="pexelsImportForm.tags"
-              mode="tags"
-              :token-separators="[',', '，']"
-              :open="false"
-              :disabled="pexelsImportSubmitting"
-              placeholder="可选，未填写时自动使用关键词"
-            />
-          </FormItem>
-        </Form>
-        <p class="import-form-note">
-          图片将下载后保存到本站 COS。仅用于毕业设计演示，请保留 Pexels 来源署名。
-        </p>
-        <p class="import-form-note">本次最多导入 10 张，导入过程可能需要几十秒。</p>
-        <Alert
-          v-if="pexelsImportWarning"
-          class="import-form-message"
-          type="warning"
-          show-icon
-          message="导入耗时较长或网络中断"
-          description="请先检查已通过列表中的导入结果，再决定是否重试。"
-        />
-        <Alert
-          v-if="pexelsImportError"
-          class="import-form-message"
-          type="error"
-          show-icon
-          message="导入失败"
-          :description="pexelsImportError"
-        />
-      </template>
-
-      <template #footer>
-        <template v-if="pexelsImportResult">
-          <Button type="primary" @click="closePexelsImport">查看审核列表</Button>
-          <Button @click="closePexelsImport">关闭</Button>
-        </template>
-        <template v-else>
-          <Button @click="closePexelsImport">取消</Button>
-          <Button type="primary" :loading="pexelsImportSubmitting" @click="submitPexelsImport">
-            开始导入
-          </Button>
-        </template>
-      </template>
-    </Modal>
   </div>
 </template>
 
 <style scoped>
 .admin-toolbar {
-  margin-top: 20px;
+  margin-top: 24px;
+  padding: 12px;
+  border: 1px solid var(--cp-border-subtle);
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-surface);
 }
 
 .toolbar-count {
@@ -554,17 +341,17 @@ const emptyText = '当前没有符合条件的图片'
 
 .review-workbench {
   display: grid;
-  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.6fr);
-  gap: 20px;
+  grid-template-columns: minmax(300px, 0.78fr) minmax(0, 1.65fr);
+  gap: 16px;
   align-items: start;
 }
 
 .review-queue,
 .review-detail {
   border: 1px solid var(--cp-border);
-  border-radius: 14px;
+  border-radius: var(--cp-radius-lg);
   background: #fff;
-  box-shadow: 0 8px 28px rgba(20, 27, 36, 0.04);
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
 }
 
 .review-queue {
@@ -592,7 +379,13 @@ const emptyText = '当前没有符合条件的图片'
   font-size: 16px;
 }
 
-.review-queue-heading > span {
+.review-queue-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-queue-count {
   display: grid;
   width: 28px;
   height: 28px;
@@ -601,6 +394,49 @@ const emptyText = '当前没有符合条件的图片'
   background: #f1f3f5;
   font-size: 12px;
   font-weight: 600;
+}
+
+.review-queue-pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid var(--cp-border-subtle);
+  border-radius: 999px;
+  background: var(--cp-bg);
+}
+
+.review-queue-page-button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cp-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.review-queue-page-button:hover:not(:disabled) {
+  background: var(--cp-border-subtle);
+}
+
+.review-queue-page-button:disabled {
+  color: var(--cp-text-muted);
+  cursor: not-allowed;
+}
+
+.review-queue-page-label {
+  min-width: 32px;
+  color: var(--cp-text-soft);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .review-queue-item {
@@ -612,16 +448,16 @@ const emptyText = '当前没有符合条件的图片'
   margin-top: 8px;
   padding: 9px;
   border: 1px solid transparent;
-  border-radius: 10px;
-  background: #f8f9fa;
+  border-radius: var(--cp-radius);
+  background: var(--cp-bg);
   cursor: pointer;
   text-align: left;
 }
 
 .review-queue-item-active {
-  border-color: #cbd0d5;
+  border-color: var(--cp-text);
   background: #fff;
-  box-shadow: 0 4px 12px rgba(20, 27, 36, 0.06);
+  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.06);
 }
 
 .review-queue-thumb {
@@ -691,8 +527,8 @@ const emptyText = '当前没有符合条件的图片'
 .review-preview {
   position: relative;
   display: grid;
-  min-height: 280px;
-  max-height: 420px;
+  min-height: 340px;
+  max-height: 480px;
   place-items: center;
   overflow: hidden;
   background: #202326;
@@ -701,7 +537,7 @@ const emptyText = '当前没有符合条件的图片'
 .review-preview img {
   display: block;
   width: 100%;
-  max-height: 420px;
+  max-height: 480px;
   object-fit: contain;
 }
 
@@ -718,11 +554,12 @@ const emptyText = '当前没有符合条件的图片'
 }
 
 .review-detail-body {
-  padding: 18px 20px 20px;
+  padding: 22px 24px 24px;
 }
 
 .review-detail-heading h2 {
-  font-size: 20px;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-size: 22px;
 }
 
 .review-description {
@@ -750,56 +587,6 @@ const emptyText = '当前没有符合条件的图片'
   margin-inline-end: 0;
 }
 
-.import-result-heading {
-  margin-bottom: 16px;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.import-result-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.import-result-stats > div {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px;
-  border: 1px solid var(--cp-border);
-  border-radius: 10px;
-  background: #f8f9fa;
-  text-align: center;
-}
-
-.import-result-stats span {
-  color: var(--cp-text-soft);
-  font-size: 12px;
-}
-
-.import-result-stats strong {
-  font-size: 24px;
-}
-
-.import-result-stats .import-stat-failed strong {
-  color: #cf1322;
-}
-
-.import-result-message {
-  margin-top: 14px;
-}
-
-.import-form-note {
-  margin: 4px 0;
-  color: var(--cp-text-soft);
-  font-size: 12px;
-}
-
-.import-form-message {
-  margin-top: 12px;
-}
-
 .review-tags {
   display: flex;
   flex-wrap: wrap;
@@ -812,8 +599,8 @@ const emptyText = '当前没有符合条件的图片'
   gap: 8px;
   margin-top: 14px;
   padding: 12px;
-  border-radius: 9px;
-  background: #f6f7f8;
+  border-radius: var(--cp-radius);
+  background: var(--cp-bg-soft);
 }
 
 .review-metadata div {
@@ -854,6 +641,10 @@ const emptyText = '当前没有符合条件的图片'
 
 .review-actions :deep(.ant-btn-primary) {
   min-width: 170px;
+}
+
+.review-actions :deep(.ant-btn) {
+  border-radius: var(--cp-radius);
 }
 
 @media (max-width: 900px) {

@@ -98,6 +98,9 @@ watch(dataVersion, load)
       <template #icon><ArrowLeftOutlined /></template>
       返回图库
     </Button>
+    <div v-if="image" class="detail-breadcrumb">
+      共享图库 <span>/</span> {{ image.category || '图片' }} <span>/</span> 详情
+    </div>
 
     <div v-if="loading" class="detail">
       <Skeleton.Image active class="detail-skeleton-image" />
@@ -244,13 +247,26 @@ watch(dataVersion, load)
 <style scoped>
 .back-link {
   padding-left: 0;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  color: var(--cp-text-soft);
+  font-size: 12px;
+}
+
+.detail-breadcrumb {
+  margin-bottom: 20px;
+  color: var(--cp-text-muted);
+  font-size: 11px;
+}
+
+.detail-breadcrumb span {
+  padding: 0 6px;
+  color: var(--cp-border);
 }
 
 .detail {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.9fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  gap: 20px;
   align-items: start;
 }
 
@@ -262,12 +278,13 @@ watch(dataVersion, load)
 .detail-media {
   position: relative;
   background: #202326;
-  border-radius: 10px;
+  border-radius: var(--cp-radius-lg);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 480px;
+  min-height: 520px;
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.1);
 }
 
 .detail-media img {
@@ -285,9 +302,9 @@ watch(dataVersion, load)
 
 .detail-image-meta {
   position: absolute;
-  right: 14px;
-  bottom: 12px;
-  left: 14px;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
   display: flex;
   justify-content: space-between;
   color: #fff;
@@ -303,11 +320,11 @@ watch(dataVersion, load)
 }
 
 .detail-info {
-  padding: 20px;
+  padding: 24px;
   border: 1px solid var(--cp-border);
-  border-radius: 12px;
+  border-radius: var(--cp-radius-lg);
   background: #fff;
-  box-shadow: 0 8px 28px rgba(20, 27, 36, 0.04);
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
 }
 
 .detail-info :deep(.ant-descriptions-item-label) {
@@ -325,6 +342,10 @@ watch(dataVersion, load)
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.detail-heading .cp-page-title {
+  font-size: 24px;
 }
 
 .detail-introduction {
@@ -354,7 +375,9 @@ watch(dataVersion, load)
 }
 
 .detail-descriptions {
+  padding-top: 16px;
   margin-bottom: 20px;
+  border-top: 1px solid var(--cp-border-subtle);
 }
 
 .detail-owner {
@@ -367,6 +390,10 @@ watch(dataVersion, load)
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.detail-actions :deep(.ant-btn) {
+  border-radius: var(--cp-radius);
 }
 
 .detail-status {

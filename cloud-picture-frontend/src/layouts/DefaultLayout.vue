@@ -4,6 +4,7 @@ import AppHeader from '../components/AppHeader.vue'
 import UploadModal from '../components/UploadModal.vue'
 import ImageEditModal from '../components/ImageEditModal.vue'
 import ReviewModal from '../components/ReviewModal.vue'
+import PexelsImportModal from '../components/PexelsImportModal.vue'
 import { uploadOpen } from '../stores/ui'
 </script>
 
@@ -16,6 +17,7 @@ import { uploadOpen } from '../stores/ui'
     <UploadModal v-model:open="uploadOpen" />
     <ImageEditModal />
     <ReviewModal />
+    <PexelsImportModal />
   </div>
 </template>
 

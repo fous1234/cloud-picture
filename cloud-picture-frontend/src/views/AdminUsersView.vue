@@ -179,14 +179,21 @@ watch(dataVersion, load)
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'account'">{{ record.account }}</template>
-          <template v-else-if="column.key === 'name'">{{ record.name || '—' }}</template>
+          <template v-else-if="column.key === 'name'">
+            <span class="user-name-cell">
+              <Avatar :src="record.avatar || undefined" :size="28">
+                {{ (record.name || record.account).slice(0, 1) }}
+              </Avatar>
+              <span>{{ record.name || '—' }}</span>
+            </span>
+          </template>
           <template v-else-if="column.key === 'role'">
-            <Tag :color="record.role === 'ADMIN' ? 'gold' : 'blue'">
+            <Tag class="role-tag">
               {{ record.role === 'ADMIN' ? '管理员' : '普通用户' }}
             </Tag>
           </template>
           <template v-else-if="column.key === 'status'">
-            <Tag :color="record.status === 1 ? 'success' : 'error'">
+            <Tag :class="['user-status-tag', record.status === 1 ? 'user-status-active' : 'user-status-disabled']">
               {{ USER_STATUS_TEXT[record.status as UserStatus] }}
             </Tag>
           </template>
@@ -213,11 +220,16 @@ watch(dataVersion, load)
       <article v-for="user in users" :key="user.id" class="user-card">
         <div class="user-card-head">
           <span class="user-account">{{ user.account }}</span>
-          <Tag :color="user.status === 1 ? 'success' : 'error'">
+          <Tag :class="['user-status-tag', user.status === 1 ? 'user-status-active' : 'user-status-disabled']">
             {{ USER_STATUS_TEXT[user.status] }}
           </Tag>
         </div>
-        <div class="user-card-meta">昵称：{{ user.name || '—' }}</div>
+        <div class="user-card-identity">
+          <Avatar :src="user.avatar || undefined" :size="36">
+            {{ (user.name || user.account).slice(0, 1) }}
+          </Avatar>
+          <strong>{{ user.name || user.account }}</strong>
+        </div>
         <div class="user-card-meta">
           角色：{{ user.role === 'ADMIN' ? '管理员' : '普通用户' }}
         </div>
@@ -264,12 +276,12 @@ watch(dataVersion, load)
             : '启用后该用户可以重新登录并使用图库。' }}
         </p>
         <div class="status-modal-user">
-          <Avatar :src="undefined" :size="40">{{ (selectedUser.name || selectedUser.account).slice(0, 1) }}</Avatar>
+          <Avatar :src="selectedUser.avatar || undefined" :size="40">{{ (selectedUser.name || selectedUser.account).slice(0, 1) }}</Avatar>
           <div>
             <strong>{{ selectedUser.name || selectedUser.account }}</strong>
             <span>{{ selectedUser.account }} · {{ selectedUser.role === 'ADMIN' ? '管理员' : '普通用户' }}</span>
           </div>
-          <Tag :color="selectedUser.status === 1 ? 'success' : 'error'">
+          <Tag :class="['user-status-tag', selectedUser.status === 1 ? 'user-status-active' : 'user-status-disabled']">
             {{ USER_STATUS_TEXT[selectedUser.status] }}
           </Tag>
         </div>
@@ -283,7 +295,11 @@ watch(dataVersion, load)
 
 <style scoped>
 .admin-toolbar {
-  margin-top: 20px;
+  margin-top: 24px;
+  padding: 12px;
+  border: 1px solid var(--cp-border-subtle);
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-surface);
 }
 
 .section-kicker {
@@ -296,8 +312,9 @@ watch(dataVersion, load)
 .user-table-panel {
   overflow: hidden;
   border: 1px solid var(--cp-border);
-  border-radius: 12px;
+  border-radius: var(--cp-radius-lg);
   background: #fff;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
 }
 
 .user-table-panel :deep(.ant-table) {
@@ -305,8 +322,8 @@ watch(dataVersion, load)
 }
 
 .user-table-panel :deep(.ant-table-thead > tr > th) {
-  background: #f7f8f9;
-  color: #555d65;
+  background: var(--cp-bg);
+  color: var(--cp-text-soft);
   font-size: 11px;
   font-weight: 600;
 }
@@ -314,6 +331,36 @@ watch(dataVersion, load)
 .user-table-panel :deep(.ant-table-tbody > tr > td) {
   border-bottom-color: #eff0f2;
   font-size: 12px;
+}
+
+.user-name-cell,
+.user-card-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-name-cell > span:last-child,
+.user-card-identity strong {
+  font-weight: 600;
+}
+
+.role-tag {
+  border-color: var(--cp-border-subtle);
+  background: var(--cp-bg-soft);
+  color: var(--cp-text);
+}
+
+.user-status-tag.user-status-active {
+  border-color: var(--cp-status-approved-border);
+  background: var(--cp-status-approved-bg);
+  color: var(--cp-status-approved-fg);
+}
+
+.user-status-tag.user-status-disabled {
+  border-color: var(--cp-status-rejected-border);
+  background: var(--cp-status-rejected-bg);
+  color: var(--cp-status-rejected-fg);
 }
 
 .status-modal-copy {
@@ -327,8 +374,8 @@ watch(dataVersion, load)
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--cp-border);
-  border-radius: 10px;
-  background: #f8f9fa;
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-bg);
 }
 
 .status-modal-user > div {
@@ -352,9 +399,10 @@ watch(dataVersion, load)
 .status-modal-warning {
   margin-top: 12px;
   padding: 10px 12px;
-  border-radius: 8px;
-  background: #fff8e8;
-  color: #72541a;
+  border: 1px solid var(--cp-status-pending-border);
+  border-radius: var(--cp-radius);
+  background: var(--cp-status-pending-bg);
+  color: var(--cp-status-pending-fg);
   font-size: 12px;
 }
 
@@ -376,7 +424,9 @@ watch(dataVersion, load)
   gap: 6px;
   padding: 16px;
   border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius);
+  border-radius: var(--cp-radius-lg);
+  background: var(--cp-surface);
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
 }
 
 .user-card-head {
@@ -384,6 +434,11 @@ watch(dataVersion, load)
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.user-card-identity {
+  justify-content: flex-start;
+  padding: 4px 0;
 }
 
 .user-account {
