@@ -88,8 +88,9 @@ public class ImageServiceImpl implements ImageService {
             image.setPicWidth(size[0]);
             image.setPicHeight(size[1]);
         }
-        image.setOwnerId(CurrentUser.get().getId());
-        image.setReviewStatus(Image.REVIEW_PENDING);
+        CurrentUser currentUser = CurrentUser.get();
+        image.setOwnerId(currentUser.getId());
+        image.setReviewStatus(currentUser.isAdmin() ? Image.REVIEW_PASSED : Image.REVIEW_PENDING);
         try {
             imageMapper.insert(image);
             imageTagMapper.increaseTags(image.tagList());
@@ -108,6 +109,16 @@ public class ImageServiceImpl implements ImageService {
     public PageData<ImageVO> pageImages(ImageQueryRequest request) {
         LambdaQueryWrapper<Image> wrapper = request.toQueryWrapper()
                 .eq(Image::getReviewStatus, Image.REVIEW_PASSED);
+        Page<Image> page = imageMapper.selectPage(Page.of(request.getCurrent(), request.getSize()), wrapper);
+        List<ImageVO> records = page.getRecords().stream().map(this::toVO).toList();
+        uploaderFiller.fillOwners(records);
+        return PageData.of(records, page.getTotal(), page.getCurrent(), page.getSize());
+    }
+
+    public PageData<ImageVO> pageMyImages(ImageQueryRequest request) {
+        Long ownerId = CurrentUser.get().getId();
+        LambdaQueryWrapper<Image> wrapper = request.toQueryWrapper()
+                .eq(Image::getOwnerId, ownerId);
         Page<Image> page = imageMapper.selectPage(Page.of(request.getCurrent(), request.getSize()), wrapper);
         List<ImageVO> records = page.getRecords().stream().map(this::toVO).toList();
         uploaderFiller.fillOwners(records);

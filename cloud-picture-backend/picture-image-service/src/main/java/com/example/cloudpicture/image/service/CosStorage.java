@@ -8,6 +8,7 @@ import com.qcloud.cos.http.HttpMethodName;
 import com.qcloud.cos.model.GeneratePresignedUrlRequest;
 import com.qcloud.cos.model.ObjectMetadata;
 import com.qcloud.cos.model.PutObjectRequest;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
@@ -52,6 +53,21 @@ public class CosStorage {
         } catch (IOException e) {
             log.error("读取上传文件失败, key={}", key, e);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "读取上传文件失败");
+        }
+    }
+
+    /** 字节上传：内容已在内存中（如图源导入下载完成后）的场景 */
+    public void upload(byte[] content, String key, String contentType) {
+        requireConfigured();
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(content.length);
+        metadata.setContentType(contentType);
+        try {
+            cosConfig.cosClient().putObject(new PutObjectRequest(cosConfig.getBucket(), key,
+                    new ByteArrayInputStream(content), metadata));
+        } catch (CosClientException e) {
+            log.error("图片上传 COS 失败, key={}", key, e);
+            throw new BusinessException(ErrorCode.COS_ERROR, "图片上传失败");
         }
     }
 

@@ -46,6 +46,10 @@ export interface ImageVO {
   reviewStatus: ReviewStatus
   reviewMessage: string | null
   createTime: string | null
+  source: 'LOCAL' | 'PEXELS'
+  sourcePageUrl: string | null
+  photographer: string | null
+  photographerUrl: string | null
   /** 仅列表接口填充（详情接口不返回上传者） */
   owner: UserBrief | null
 }

@@ -14,6 +14,8 @@ public interface ImageService {
 
     PageData<ImageVO> pageImages(ImageQueryRequest request);
 
+    PageData<ImageVO> pageMyImages(ImageQueryRequest request);
+
     ImageVO getImageById(Long id);
 
     boolean updateImage(ImageUpdateRequest request);

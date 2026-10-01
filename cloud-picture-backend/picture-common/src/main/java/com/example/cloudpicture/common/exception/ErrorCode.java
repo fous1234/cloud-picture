@@ -15,6 +15,7 @@ public enum ErrorCode {
     NOT_FOUND("NOT_FOUND", 404, "资源不存在"),
     ACCOUNT_CONFLICT("ACCOUNT_CONFLICT", 409, "账号已存在"),
     COS_ERROR("COS_ERROR", 502, "对象存储服务异常"),
+    PEXELS_ERROR("PEXELS_ERROR", 502, "Pexels 图源服务异常"),
     SYSTEM_ERROR("SYSTEM_ERROR", 500, "系统内部错误");
 
     private final String code;

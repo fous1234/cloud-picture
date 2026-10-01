@@ -112,7 +112,7 @@ async function submit() {
   errorText.value = ''
   percent.value = 0
   try {
-    uploaded.value = await uploadImage(
+    const result = await uploadImage(
       file.value,
       {
         name: form.value.name.trim() || undefined,
@@ -122,14 +122,19 @@ async function submit() {
       },
       (value) => (percent.value = value),
     )
+    uploaded.value = result
     bumpData()
-    message.success('上传成功，等待管理员审核')
+    message.success(uploadResultMessage(result))
   } catch (error) {
     // 失败时保留已选文件与表单，用户可直接重试
     errorText.value = errorMessage(error)
   } finally {
     submitting.value = false
   }
+}
+
+function uploadResultMessage(image: ImageVO) {
+  return image.reviewStatus === 1 ? '上传成功，图片已发布' : '上传成功，等待管理员审核'
 }
 
 function viewDetail() {
@@ -151,8 +156,8 @@ function viewDetail() {
     <Result
       v-if="uploaded"
       status="success"
-      title="上传成功，等待管理员审核"
-      :sub-title="`《${uploaded.name || '未命名图片'}》已提交审核`"
+      :title="uploadResultMessage(uploaded)"
+      :sub-title="uploaded.reviewStatus === 1 ? '图片已发布到共享图库' : `《${uploaded.name || '未命名图片'}》已提交审核`"
     >
       <template #extra>
         <Button type="primary" @click="viewDetail">查看详情</Button>
