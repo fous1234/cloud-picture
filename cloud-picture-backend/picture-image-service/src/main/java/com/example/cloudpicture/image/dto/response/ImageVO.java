@@ -25,6 +25,16 @@ public class ImageVO {
     private Integer reviewStatus;
     private String reviewMessage;
     private LocalDateTime createTime;
+    /** 来源：LOCAL 本地上传 / PEXELS 导入 */
+    private String source;
+    /** 来源平台图片 ID（Pexels 图片 ID） */
+    private String sourceId;
+    /** 来源图片详情页地址 */
+    private String sourcePageUrl;
+    /** 摄影师名称，前端展示 "Photo by {photographer} on Pexels" */
+    private String photographer;
+    /** 摄影师主页地址 */
+    private String photographerUrl;
 
     /** 上传者信息，仅管理员列表填充 */
     private UserBriefVO owner;
@@ -49,6 +59,11 @@ public class ImageVO {
         vo.reviewStatus = image.getReviewStatus();
         vo.reviewMessage = image.getReviewMessage();
         vo.createTime = image.getCreateTime();
+        vo.source = image.getSource();
+        vo.sourceId = image.getSourceId();
+        vo.sourcePageUrl = image.getSourcePageUrl();
+        vo.photographer = image.getPhotographer();
+        vo.photographerUrl = image.getPhotographerUrl();
         return vo;
     }
 }

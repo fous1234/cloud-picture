@@ -48,7 +48,7 @@ const owner = computed(() => {
 })
 
 const canEdit = computed(() => !!image.value && isOwner(image.value))
-const canReview = computed(() => isAdmin())
+const canReview = computed(() => !!image.value && isAdmin() && image.value.reviewStatus !== 1)
 const canDelete = computed(() => !!image.value && (isOwner(image.value) || isAdmin()))
 
 async function load() {
@@ -172,6 +172,25 @@ watch(dataVersion, load)
             {{ image.introduction || '暂无简介' }}
           </p>
 
+          <div v-if="image.source === 'PEXELS'" class="pexels-attribution">
+            <span>图片来源：Pexels</span>
+            <span v-if="image.photographer">· 摄影师：
+              <a
+                v-if="image.photographerUrl"
+                :href="image.photographerUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >{{ image.photographer }}</a>
+              <span v-else>{{ image.photographer }}</span>
+            </span>
+            <a
+              v-if="image.sourcePageUrl"
+              :href="image.sourcePageUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >查看 Pexels 来源</a>
+          </div>
+
           <div v-if="image.tags?.length" class="detail-tags">
             <Tag v-for="tag in image.tags" :key="tag">{{ tag }}</Tag>
           </div>
@@ -193,7 +212,7 @@ watch(dataVersion, load)
               </span>
               <span v-else>—</span>
             </DescriptionsItem>
-            <DescriptionsItem v-if="canEdit || canReview" label="审核信息">
+            <DescriptionsItem v-if="image.reviewStatus !== 1 && (canEdit || isAdmin())" label="审核信息">
               {{ image.reviewMessage || '—' }}
             </DescriptionsItem>
           </Descriptions>
@@ -213,7 +232,7 @@ watch(dataVersion, load)
             </Button>
           </div>
 
-          <p v-if="session.user && !canEdit && !canReview" class="detail-hint">
+          <p v-if="session.user && !canEdit && !isAdmin()" class="detail-hint">
             只有图片所有者可以修改或删除这张图片。
           </p>
         </div>
@@ -311,6 +330,20 @@ watch(dataVersion, load)
 .detail-introduction {
   color: var(--cp-text-soft);
   margin: 8px 0 12px;
+}
+
+.pexels-attribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 14px;
+  color: var(--cp-text-soft);
+  font-size: 12px;
+}
+
+.pexels-attribution a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .detail-tags {

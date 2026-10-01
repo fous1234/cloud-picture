@@ -46,6 +46,11 @@ public class ImageController {
         return ApiResponse.success(imageService.pageImages(request));
     }
 
+    @GetMapping("/mine")
+    public ApiResponse<PageData<ImageVO>> listMyImages(@Valid ImageQueryRequest request) {
+        return ApiResponse.success(imageService.pageMyImages(request));
+    }
+
     @GetMapping("/tags")
     public ApiResponse<List<String>> listTags(
             @RequestParam(value = "limit", defaultValue = "20") @Min(1) @Max(100) int limit) {

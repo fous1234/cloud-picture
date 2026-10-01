@@ -2,23 +2,33 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  Alert,
   Button,
+  Form,
+  FormItem,
   Input,
+  InputNumber,
+  Modal,
   Pagination,
   RadioButton,
   RadioGroup,
   Skeleton,
   Tag,
+  message,
 } from 'ant-design-vue'
 import { DeleteOutlined, SafetyCertificateOutlined } from '@ant-design/icons-vue'
 import type { ImageVO, ReviewStatus } from '../api/types'
 import { listAdminImages } from '../api/admin-image'
-import { errorMessage } from '../api/http'
+import { importPexelsImages } from '../api/pexels-import'
+import type { ImportResult } from '../api/pexels-import'
+import { ApiError, errorMessage } from '../api/http'
 import ErrorState from '../components/ErrorState.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { dataVersion, openReview, REVIEW_STATUS_COLOR, REVIEW_STATUS_TEXT } from '../stores/ui'
+import { isAdmin } from '../stores/session'
 import { confirmDeleteImage } from '../utils/imageActions'
 import { formatDateTime, formatDimensions } from '../utils/format'
+import { normalizeTags, tagsTooLong } from '../utils/tags'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,8 +42,21 @@ const error = ref<string | null>(null)
 const nameInput = ref('')
 const tagInput = ref('')
 const selectedImageId = ref<string | null>(null)
+const pexelsImportOpen = ref(false)
+const pexelsImportSubmitting = ref(false)
+const pexelsImportError = ref('')
+const pexelsImportWarning = ref(false)
+const pexelsImportResult = ref<ImportResult | null>(null)
+const pexelsImportFormRef = ref<{ validate: () => Promise<unknown> } | null>(null)
+const pexelsImportForm = ref({
+  keyword: '',
+  count: 5 as number | undefined,
+  category: '',
+  tags: [] as string[],
+})
 
 let requestSeq = 0
+let skipNextRouteLoad = false
 
 const STATUS_OPTIONS = [
   { value: '0', label: '待审核' },
@@ -99,7 +122,98 @@ function pushQuery(patch: Record<string, string | number | undefined>) {
   if (merged.tag) next.tag = merged.tag
   if (merged.current > 1) next.current = merged.current
   if (merged.size !== DEFAULT_PAGE_SIZE) next.size = merged.size
-  router.push({ name: 'admin-images', query: next })
+  return router.push({ name: 'admin-images', query: next })
+}
+
+function resetPexelsImport() {
+  pexelsImportForm.value = { keyword: '', count: 5, category: '', tags: [] }
+  pexelsImportError.value = ''
+  pexelsImportWarning.value = false
+  pexelsImportResult.value = null
+}
+
+function openPexelsImport() {
+  if (!pexelsImportSubmitting.value) resetPexelsImport()
+  pexelsImportOpen.value = true
+}
+
+function closePexelsImport() {
+  pexelsImportOpen.value = false
+  if (!pexelsImportSubmitting.value) resetPexelsImport()
+}
+
+async function refreshPassedImages() {
+  const current = readQuery()
+  if (current.status !== '1' || current.current !== 1) {
+    skipNextRouteLoad = true
+    try {
+      await pushQuery({ status: '1', current: 1 })
+      await load()
+    } finally {
+      skipNextRouteLoad = false
+    }
+    return
+  }
+  await load()
+}
+
+function importSummary(result: ImportResult) {
+  return `成功导入 ${result.imported} 张，跳过 ${result.skipped} 张，失败 ${result.failed} 张。`
+}
+
+async function submitPexelsImport() {
+  if (pexelsImportSubmitting.value || pexelsImportResult.value) return
+  pexelsImportError.value = ''
+  pexelsImportWarning.value = false
+  try {
+    await pexelsImportFormRef.value?.validate()
+  } catch {
+    return
+  }
+
+  const keyword = pexelsImportForm.value.keyword.trim()
+  const count = pexelsImportForm.value.count ?? 5
+  const tags = normalizeTags(pexelsImportForm.value.tags)
+  if (!tags.length) tags.push(keyword)
+  if (tagsTooLong(tags)) {
+    pexelsImportError.value = '标签总长度不能超过 512 个字符'
+    return
+  }
+
+  pexelsImportSubmitting.value = true
+  try {
+    const result = await importPexelsImages({
+      keyword,
+      count,
+      category: pexelsImportForm.value.category.trim() || undefined,
+      tags,
+    })
+    pexelsImportResult.value = result
+    await refreshPassedImages()
+    if (!pexelsImportOpen.value) message.success(`导入完成。${importSummary(result)}`)
+  } catch (e) {
+    if (e instanceof ApiError && e.code === 'NETWORK_ERROR') {
+      pexelsImportWarning.value = true
+      await refreshPassedImages()
+      if (!pexelsImportOpen.value) {
+        message.warning('导入耗时较长或网络中断，请先检查已通过列表中的结果，再决定是否重试。')
+      }
+    } else if (e instanceof ApiError && (e.code === 'PEXELS_ERROR' || e.status === 502)) {
+      pexelsImportError.value = 'Pexels 暂时不可用或配额不足，请稍后重试'
+    } else if (e instanceof ApiError && e.status === 401) {
+      return
+    } else if (e instanceof ApiError && e.status === 403) {
+      pexelsImportError.value = '没有导入权限'
+    } else if (e instanceof ApiError && e.status === 400) {
+      pexelsImportError.value = errorMessage(e)
+    } else {
+      pexelsImportError.value = '导入失败，请稍后重试'
+    }
+    if (!pexelsImportOpen.value && pexelsImportError.value) message.error(pexelsImportError.value)
+  } finally {
+    pexelsImportSubmitting.value = false
+    if (!pexelsImportOpen.value) resetPexelsImport()
+  }
 }
 
 function submitSearch() {
@@ -120,6 +234,7 @@ watch(
     const parsed = readQuery()
     nameInput.value = parsed.name ?? ''
     tagInput.value = parsed.tag ?? ''
+    if (skipNextRouteLoad) return
     load()
   },
   { immediate: true },
@@ -161,6 +276,7 @@ const emptyText = '当前没有符合条件的图片'
         @press-enter="submitSearch"
       />
       <Button type="primary" @click="submitSearch">搜索</Button>
+      <Button v-if="isAdmin()" type="primary" @click="openPexelsImport">从 Pexels 导入</Button>
       <span class="toolbar-count">共 {{ total }} 张</span>
     </div>
 
@@ -196,9 +312,12 @@ const emptyText = '当前没有符合条件的图片'
             <span>{{ image.owner?.name || '未知用户' }} · {{ formatDateTime(image.createTime) }}</span>
             <span v-if="image.tags?.length" class="review-queue-tags">{{ image.tags.slice(0, 2).join(' · ') }}</span>
           </span>
-          <Tag :color="REVIEW_STATUS_COLOR[image.reviewStatus]">
-            {{ REVIEW_STATUS_TEXT[image.reviewStatus] }}
-          </Tag>
+          <span class="review-queue-badges">
+            <Tag v-if="image.source === 'PEXELS'" class="source-tag">Pexels</Tag>
+            <Tag :color="REVIEW_STATUS_COLOR[image.reviewStatus]">
+              {{ REVIEW_STATUS_TEXT[image.reviewStatus] }}
+            </Tag>
+          </span>
         </button>
         <div class="queue-note">
           <SafetyCertificateOutlined />
@@ -230,6 +349,24 @@ const emptyText = '当前没有符合条件的图片'
             </Tag>
           </div>
           <p class="review-description">{{ selectedImage.introduction || '暂无图片简介。' }}</p>
+          <div v-if="selectedImage.source === 'PEXELS'" class="pexels-attribution">
+            <Tag>图片来源：Pexels</Tag>
+            <span v-if="selectedImage.photographer">摄影师：
+              <a
+                v-if="selectedImage.photographerUrl"
+                :href="selectedImage.photographerUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >{{ selectedImage.photographer }}</a>
+              <span v-else>{{ selectedImage.photographer }}</span>
+            </span>
+            <a
+              v-if="selectedImage.sourcePageUrl"
+              :href="selectedImage.sourcePageUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >查看 Pexels 来源</a>
+          </div>
           <div class="review-tags">
             <Tag v-if="selectedImage.category">{{ selectedImage.category }}</Tag>
             <Tag v-for="tag in selectedImage.tags" :key="tag">{{ tag }}</Tag>
@@ -264,6 +401,136 @@ const emptyText = '当前没有符合条件的图片'
         @change="changePage"
       />
     </div>
+
+    <Modal
+      v-model:open="pexelsImportOpen"
+      title="从 Pexels 导入"
+      :width="600"
+      @cancel="closePexelsImport"
+    >
+      <template v-if="pexelsImportResult">
+        <div class="import-result-heading">导入完成</div>
+        <div class="import-result-stats">
+          <div><span>成功导入</span><strong>{{ pexelsImportResult.imported }}</strong></div>
+          <div><span>跳过</span><strong>{{ pexelsImportResult.skipped }}</strong></div>
+          <div :class="{ 'import-stat-failed': pexelsImportResult.failed > 0 }">
+            <span>失败</span><strong>{{ pexelsImportResult.failed }}</strong>
+          </div>
+        </div>
+        <Alert
+          v-if="pexelsImportResult.failed > 0"
+          class="import-result-message"
+          type="warning"
+          show-icon
+          :message="importSummary(pexelsImportResult)"
+          description="可以减少导入数量后重试。"
+        />
+        <Alert
+          v-else-if="pexelsImportResult.imported === 0 && pexelsImportResult.skipped > 0"
+          class="import-result-message"
+          type="info"
+          show-icon
+          message="这些图片已经导入过"
+        />
+        <p v-else class="import-result-message">{{ importSummary(pexelsImportResult) }}</p>
+      </template>
+
+      <template v-else>
+        <Form
+          ref="pexelsImportFormRef"
+          layout="vertical"
+          :model="pexelsImportForm"
+        >
+          <FormItem
+            label="关键词"
+            name="keyword"
+            :rules="[
+              { required: true, whitespace: true, message: '请输入搜索关键词' },
+              { max: 64, message: '关键词不能超过 64 个字符' },
+            ]"
+          >
+            <Input
+              v-model:value="pexelsImportForm.keyword"
+              :maxlength="64"
+              :disabled="pexelsImportSubmitting"
+              placeholder="例如：校园风景"
+            />
+          </FormItem>
+          <FormItem
+            label="导入数量"
+            name="count"
+            :rules="[
+              { required: true, type: 'number', message: '请输入导入数量' },
+              { type: 'number', min: 1, max: 10, message: '导入数量需在 1 到 10 之间' },
+            ]"
+          >
+            <InputNumber
+              v-model:value="pexelsImportForm.count"
+              :min="1"
+              :max="10"
+              :precision="0"
+              :disabled="pexelsImportSubmitting"
+              style="width: 100%"
+            />
+          </FormItem>
+          <FormItem
+            label="分类"
+            name="category"
+            :rules="[{ max: 64, message: '分类不能超过 64 个字符' }]"
+          >
+            <Input
+              v-model:value="pexelsImportForm.category"
+              :maxlength="64"
+              :disabled="pexelsImportSubmitting"
+              placeholder="可选"
+            />
+          </FormItem>
+          <FormItem label="标签" name="tags">
+            <Select
+              v-model:value="pexelsImportForm.tags"
+              mode="tags"
+              :token-separators="[',', '，']"
+              :open="false"
+              :disabled="pexelsImportSubmitting"
+              placeholder="可选，未填写时自动使用关键词"
+            />
+          </FormItem>
+        </Form>
+        <p class="import-form-note">
+          图片将下载后保存到本站 COS。仅用于毕业设计演示，请保留 Pexels 来源署名。
+        </p>
+        <p class="import-form-note">本次最多导入 10 张，导入过程可能需要几十秒。</p>
+        <Alert
+          v-if="pexelsImportWarning"
+          class="import-form-message"
+          type="warning"
+          show-icon
+          message="导入耗时较长或网络中断"
+          description="请先检查已通过列表中的导入结果，再决定是否重试。"
+        />
+        <Alert
+          v-if="pexelsImportError"
+          class="import-form-message"
+          type="error"
+          show-icon
+          message="导入失败"
+          :description="pexelsImportError"
+        />
+      </template>
+
+      <template #footer>
+        <template v-if="pexelsImportResult">
+          <Button type="primary" @click="closePexelsImport">查看审核列表</Button>
+          <Button @click="closePexelsImport">关闭</Button>
+        </template>
+        <template v-else>
+          <Button @click="closePexelsImport">取消</Button>
+          <Button type="primary" :loading="pexelsImportSubmitting" @click="submitPexelsImport">
+            开始导入
+          </Button>
+        </template>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -403,6 +670,12 @@ const emptyText = '当前没有符合条件的图片'
   font-size: 10px;
 }
 
+.review-queue-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .queue-note {
   display: flex;
   gap: 8px;
@@ -456,6 +729,75 @@ const emptyText = '当前没有符合条件的图片'
   margin: 10px 0;
   color: var(--cp-text-soft);
   font-size: 13px;
+}
+
+.pexels-attribution {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  color: var(--cp-text-soft);
+  font-size: 12px;
+}
+
+.pexels-attribution a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pexels-attribution :deep(.ant-tag) {
+  margin-inline-end: 0;
+}
+
+.import-result-heading {
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.import-result-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.import-result-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--cp-border);
+  border-radius: 10px;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.import-result-stats span {
+  color: var(--cp-text-soft);
+  font-size: 12px;
+}
+
+.import-result-stats strong {
+  font-size: 24px;
+}
+
+.import-result-stats .import-stat-failed strong {
+  color: #cf1322;
+}
+
+.import-result-message {
+  margin-top: 14px;
+}
+
+.import-form-note {
+  margin: 4px 0;
+  color: var(--cp-text-soft);
+  font-size: 12px;
+}
+
+.import-form-message {
+  margin-top: 12px;
 }
 
 .review-tags {

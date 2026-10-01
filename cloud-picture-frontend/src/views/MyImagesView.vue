@@ -7,6 +7,7 @@ import { listMyImages } from '../api/image'
 import { errorMessage } from '../api/http'
 import ImageGrid from '../components/ImageGrid.vue'
 import { dataVersion, openUpload } from '../stores/ui'
+import { isAdmin } from '../stores/session'
 import { confirmDeleteImage } from '../utils/imageActions'
 
 const route = useRoute()
@@ -29,7 +30,7 @@ const STATUS_OPTIONS = [
 ]
 
 function readQuery() {
-  const status = typeof route.query.status === 'string' ? route.query.status : 'all'
+  const status = !isAdmin() && typeof route.query.status === 'string' ? route.query.status : 'all'
   const current = Number(route.query.current) > 0 ? Number(route.query.current) : 1
   const size = Number(route.query.size) > 0 ? Number(route.query.size) : DEFAULT_PAGE_SIZE
   return { status, current, size }
@@ -45,6 +46,7 @@ const status = computed({
 })
 
 const reviewStatusParam = computed<ReviewStatus | undefined>(() => {
+  if (isAdmin()) return undefined
   const value = readQuery().status
   return value === 'all' ? undefined : (Number(value) as ReviewStatus)
 })
@@ -84,7 +86,7 @@ function changePage(page: number, size: number) {
 }
 
 const emptyText = computed(() =>
-  readQuery().status === 'all' ? '还没有上传图片' : '该状态下没有图片',
+  isAdmin() || readQuery().status === 'all' ? '还没有上传图片' : '该状态下没有图片',
 )
 </script>
 
@@ -94,13 +96,14 @@ const emptyText = computed(() =>
       <div>
         <p class="section-kicker">PERSONAL COLLECTION</p>
         <h1 class="cp-page-title">我的上传</h1>
-        <p class="cp-page-subtitle">查看审核状态、维护图片信息，删除不再需要的图片</p>
+        <p class="cp-page-subtitle">
+          {{ isAdmin() ? '查看本人上传的图片，维护图片信息，删除不再需要的图片' : '查看审核状态、维护图片信息，删除不再需要的图片' }}
+        </p>
       </div>
-      <Button type="primary" @click="openUpload">上传图片</Button>
     </div>
 
     <div class="cp-toolbar">
-      <RadioGroup v-model:value="status" button-style="solid">
+      <RadioGroup v-if="!isAdmin()" v-model:value="status" button-style="solid">
         <RadioButton v-for="option in STATUS_OPTIONS" :key="option.value" :value="option.value">
           {{ option.label }}
         </RadioButton>
@@ -114,13 +117,6 @@ const emptyText = computed(() =>
           <Button size="small" @click="load">重试</Button>
         </template>
       </Alert>
-      <Alert
-        class="dependency-note"
-        type="warning"
-        show-icon
-        message="后端接口依赖：无法完成真实数据联调"
-        description="本页需要按当前用户过滤的分页接口 GET /api/image/mine?current=&size=&reviewStatus=。当前后端未实现该端点（GET /api/image/list 只返回已通过审核的图片，且没有 owner 过滤参数），因此这里只会展示接口错误状态，不会用共享图库列表或假数据冒充“我的上传”。接口补齐后本页无需改动即可生效。"
-      />
     </template>
 
     <Spin v-else :spinning="loading && images.length > 0">
@@ -129,7 +125,7 @@ const emptyText = computed(() =>
           :loading="loading && !images.length"
           :images="images"
           :empty-text="emptyText"
-          show-status
+          :show-status="!isAdmin()"
           :can-edit="() => true"
           :can-delete="() => true"
           @retry="load"
@@ -178,10 +174,6 @@ const emptyText = computed(() =>
   margin-left: auto;
   color: var(--cp-text-soft);
   font-size: 13px;
-}
-
-.dependency-note {
-  margin-top: 12px;
 }
 
 .my-upload-grid :deep(.cp-masonry) {

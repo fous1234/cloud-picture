@@ -20,6 +20,9 @@ public class Image {
     public static final int REVIEW_PASSED = 1;
     public static final int REVIEW_REJECTED = 2;
 
+    public static final String SOURCE_LOCAL = "LOCAL";
+    public static final String SOURCE_PEXELS = "PEXELS";
+
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
@@ -52,6 +55,21 @@ public class Image {
     private Long reviewerId;
 
     private LocalDateTime reviewTime;
+
+    /** 图片来源：LOCAL 本地上传 / PEXELS 图源导入 */
+    private String source;
+
+    /** 来源平台图片 ID（Pexels 图片 ID），来源去重键 */
+    private String sourceId;
+
+    /** 来源图片详情页地址 */
+    private String sourcePageUrl;
+
+    /** 摄影师名称 */
+    private String photographer;
+
+    /** 摄影师主页地址 */
+    private String photographerUrl;
 
     private LocalDateTime createTime;
 

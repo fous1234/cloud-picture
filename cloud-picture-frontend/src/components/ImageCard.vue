@@ -103,6 +103,21 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
         <Tag v-for="tag in visibleTags" :key="tag">{{ tag }}</Tag>
       </div>
 
+      <p v-if="image.source === 'PEXELS'" class="pexels-credit">
+        <template v-if="image.photographer">
+          Photo by
+          <a
+            v-if="image.photographerUrl"
+            :href="image.photographerUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >{{ image.photographer }}</a>
+          <span v-else>{{ image.photographer }}</span>
+          on Pexels
+        </template>
+        <span v-else>图片来源：Pexels</span>
+      </p>
+
       <p v-if="showStatus && image.reviewStatus === 2 && image.reviewMessage" class="card-reason">
         拒绝理由：{{ image.reviewMessage }}
       </p>
@@ -251,6 +266,17 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
   margin: 8px 0 0;
   font-size: 12px;
   color: #cf1322;
+}
+
+.pexels-credit {
+  margin: 7px 0 0;
+  color: var(--cp-text-soft);
+  font-size: 11px;
+}
+
+.pexels-credit a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 @media (max-width: 575px) {

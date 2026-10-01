@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Input, Pagination, Select, Spin, Tag } from 'ant-design-vue'
+import { Button, Input, Select, Spin, Tag } from 'ant-design-vue'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import type { ImageVO } from '../api/types'
 import { listImages, listTags } from '../api/image'
@@ -19,43 +19,52 @@ const DEFAULT_PAGE_SIZE = 12
 const images = ref<ImageVO[]>([])
 const total = ref(0)
 const loading = ref(false)
+const loadingMore = ref(false)
 const error = ref<string | null>(null)
+const moreError = ref<string | null>(null)
+const hasMore = ref(false)
 const hotTags = ref<string[]>([])
 const tagsLoading = ref(false)
 const tagsFailed = ref(false)
 const keyword = ref('')
+const loadMoreTarget = ref<HTMLElement | null>(null)
+const supportsObserver = ref(false)
 
 /** 防止乱序响应覆盖较新的搜索结果 */
 let requestSeq = 0
+let nextPage = 1
+let loadObserver: IntersectionObserver | undefined
 
 function readQuery() {
   const query = route.query
   const asString = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
-  const asNumber = (value: unknown, fallback: number) => {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-  }
   return {
     q: asString(query.q),
     category: asString(query.category),
     tag: asString(query.tag),
-    current: asNumber(query.current, 1),
-    size: asNumber(query.size, DEFAULT_PAGE_SIZE),
   }
 }
 
 const filters = computed(() => readQuery())
 const hasFilters = computed(() => !!(filters.value.q || filters.value.category || filters.value.tag))
+const searchMode = ref(hasFilters.value)
+const showSearchResults = computed(() => searchMode.value || hasFilters.value)
 
 async function loadImages() {
-  const { q, category, tag, current, size } = readQuery()
+  const { q, category, tag } = readQuery()
   const seq = ++requestSeq
+  nextPage = 1
   loading.value = true
+  loadingMore.value = false
   error.value = null
+  moreError.value = null
+  hasMore.value = false
+  images.value = []
+  total.value = 0
   try {
     const page = await listImages({
-      current,
-      size,
+      current: nextPage,
+      size: DEFAULT_PAGE_SIZE,
       name: q,
       category,
       tag,
@@ -63,15 +72,73 @@ async function loadImages() {
     if (seq !== requestSeq) return
     images.value = page.records ?? []
     total.value = page.total ?? 0
+    nextPage = page.current + 1
+    hasMore.value = page.current * page.size < page.total
   } catch (e) {
     if (seq !== requestSeq) return
     images.value = []
     total.value = 0
     error.value = errorMessage(e)
   } finally {
-    if (seq === requestSeq) loading.value = false
+    if (seq === requestSeq) {
+      loading.value = false
+      await nextTick()
+      refreshLoadObserver()
+    }
   }
 }
+
+async function loadMore() {
+  if (loading.value || loadingMore.value || !hasMore.value || moreError.value) return
+  const { q, category, tag } = readQuery()
+  const seq = requestSeq
+  loadingMore.value = true
+  moreError.value = null
+  try {
+    const page = await listImages({
+      current: nextPage,
+      size: DEFAULT_PAGE_SIZE,
+      name: q,
+      category,
+      tag,
+    })
+    if (seq !== requestSeq) return
+    const knownIds = new Set(images.value.map((image) => image.id))
+    images.value.push(...(page.records ?? []).filter((image) => !knownIds.has(image.id)))
+    total.value = page.total ?? 0
+    nextPage = page.current + 1
+    hasMore.value = page.current * page.size < page.total
+  } catch (e) {
+    if (seq === requestSeq) moreError.value = errorMessage(e)
+  } finally {
+    if (seq === requestSeq) {
+      loadingMore.value = false
+      await nextTick()
+      refreshLoadObserver()
+    }
+  }
+}
+
+function refreshLoadObserver() {
+  const target = loadMoreTarget.value
+  if (!target || !loadObserver) return
+  loadObserver.unobserve(target)
+  loadObserver.observe(target)
+}
+
+onMounted(() => {
+  if (!('IntersectionObserver' in window) || !loadMoreTarget.value) return
+  supportsObserver.value = true
+  loadObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadMore()
+    },
+    { rootMargin: '500px 0px' },
+  )
+  loadObserver.observe(loadMoreTarget.value)
+})
+
+onUnmounted(() => loadObserver?.disconnect())
 
 async function loadTags() {
   tagsLoading.value = true
@@ -104,41 +171,43 @@ watch(keyword, (value) => {
   debounceTimer = window.setTimeout(() => {
     const next = value.trim() || undefined
     if (next === filters.value.q) return
-    applyQuery({ q: next, current: 1 })
+    applyQuery({ q: next })
   }, 400)
 })
 
 /** 把筛选状态写入 URL（默认值不写入，保持地址可读） */
-function applyQuery(patch: Record<string, string | number | undefined>) {
+function applyQuery(patch: Record<string, string | undefined>) {
+  searchMode.value = true
   const merged = { ...readQuery(), ...patch }
-  const query: Record<string, string | number> = {}
+  const query: Record<string, string> = {}
   if (merged.q) query.q = merged.q
   if (merged.category) query.category = merged.category
   if (merged.tag) query.tag = merged.tag
-  if (merged.current > 1) query.current = merged.current
-  if (merged.size !== DEFAULT_PAGE_SIZE) query.size = merged.size
   router.push({ name: 'gallery', query })
 }
 
 function submitSearch() {
-  applyQuery({ q: keyword.value.trim() || undefined, current: 1 })
+  applyQuery({ q: keyword.value.trim() || undefined })
 }
 
 function setCategory(value: unknown) {
-  applyQuery({ category: (value as string) || undefined, current: 1 })
+  applyQuery({ category: (value as string) || undefined })
 }
 
 function toggleTag(tag: string) {
-  applyQuery({ tag: filters.value.tag === tag ? undefined : tag, current: 1 })
+  applyQuery({ tag: filters.value.tag === tag ? undefined : tag })
 }
 
 function clearFilters() {
+  searchMode.value = true
   keyword.value = ''
   router.push({ name: 'gallery' })
 }
 
-function changePage(page: number, size: number) {
-  applyQuery({ current: page, size })
+function showGalleryHome() {
+  searchMode.value = false
+  keyword.value = ''
+  router.push({ name: 'gallery' })
 }
 
 function usable(image: ImageVO) {
@@ -149,6 +218,11 @@ function onDelete(image: ImageVO) {
   confirmDeleteImage(image, loadImages)
 }
 
+function retryLoadMore() {
+  moreError.value = null
+  loadMore()
+}
+
 const emptyText = computed(() =>
   hasFilters.value ? '没有找到匹配图片' : '图库还没有图片',
 )
@@ -156,7 +230,7 @@ const emptyText = computed(() =>
 
 <template>
   <div class="gallery-view">
-    <section v-if="!hasFilters" class="hero">
+    <section v-if="!showSearchResults" class="hero">
       <div class="cp-container hero-inner">
         <div class="hero-copy">
           <p class="hero-kicker">EDITORIAL CURATION <span>·</span> 灵感收录</p>
@@ -211,10 +285,14 @@ const emptyText = computed(() =>
     </section>
 
     <main class="cp-container cp-page gallery-content">
-      <div v-if="hasFilters" class="search-results-head">
+      <div v-if="showSearchResults" class="search-results-head">
         <p class="section-kicker">SEARCH RESULTS</p>
-        <h1 class="cp-page-title">“{{ filters.q || filters.category || filters.tag }}” 的搜索结果</h1>
-        <p class="cp-page-subtitle">浏览符合条件的共享图片</p>
+        <h1 class="cp-page-title">
+          {{ hasFilters ? `“${filters.q || filters.category || filters.tag}” 的搜索结果` : '搜索结果' }}
+        </h1>
+        <p class="cp-page-subtitle">
+          {{ hasFilters ? '浏览符合条件的共享图片' : '浏览全部共享图片' }}
+        </p>
       </div>
 
       <div v-else class="gallery-section-head">
@@ -225,8 +303,8 @@ const emptyText = computed(() =>
         <span class="toolbar-count">共 {{ total }} 张图片</span>
       </div>
 
-      <div v-if="!hasFilters" class="category-strip" aria-label="图片分类">
-        <button class="category-chip category-chip-active" type="button" @click="clearFilters">
+      <div v-if="!showSearchResults" class="category-strip" aria-label="图片分类">
+        <button class="category-chip category-chip-active" type="button" @click="showGalleryHome">
           全部作品
         </button>
         <button
@@ -240,7 +318,7 @@ const emptyText = computed(() =>
         </button>
       </div>
 
-      <div v-if="hasFilters" class="cp-toolbar search-toolbar">
+      <div v-if="showSearchResults" class="cp-toolbar search-toolbar">
         <Select
           :value="filters.category"
           :options="CATEGORY_OPTIONS"
@@ -254,7 +332,7 @@ const emptyText = computed(() =>
       </div>
 
       <div v-if="hasFilters" class="cp-tag-row">
-        <Tag v-if="filters.q" closable @close="applyQuery({ q: undefined, current: 1 })">
+        <Tag v-if="filters.q" closable @close="applyQuery({ q: undefined })">
           关键词：{{ filters.q }}
         </Tag>
         <Tag v-if="filters.category" closable @close="setCategory(undefined)">
@@ -265,7 +343,7 @@ const emptyText = computed(() =>
         </Tag>
       </div>
 
-      <div v-if="hasFilters" class="tags-block">
+      <div v-if="showSearchResults" class="tags-block">
         <div class="tags-label">常用标签</div>
         <div v-if="tagsLoading" class="tags-loading">
           <Spin size="small" />
@@ -301,22 +379,26 @@ const emptyText = computed(() =>
           @delete="onDelete"
         >
           <template #empty-action>
-            <Button v-if="!hasFilters" type="primary" @click="openUpload">上传图片</Button>
+            <Button v-if="!showSearchResults" type="primary" @click="openUpload">上传图片</Button>
             <Button v-else @click="clearFilters">清除筛选</Button>
           </template>
         </ImageGrid>
       </Spin>
 
-      <div v-if="total > 0" class="cp-pagination">
-        <Pagination
-          :current="filters.current"
-          :page-size="filters.size"
-          :total="total"
-          :page-size-options="['12', '24', '48']"
-          show-size-changer
-          show-less-items
-          @change="changePage"
-        />
+      <div ref="loadMoreTarget" class="load-more-status" aria-live="polite">
+        <Spin v-if="loadingMore" size="small" />
+        <template v-else-if="moreError">
+          <span>{{ moreError }}</span>
+          <Button type="link" size="small" @click="retryLoadMore">重试</Button>
+        </template>
+        <Button
+          v-else-if="hasMore && !supportsObserver"
+          type="link"
+          @click="loadMore"
+        >
+          加载更多图片
+        </Button>
+        <span v-else-if="images.length && !hasMore">已加载全部图片</span>
       </div>
     </main>
   </div>
@@ -395,9 +477,59 @@ const emptyText = computed(() =>
   flex: 0 0 145px;
 }
 
-.hero-search :deep(.ant-input-affix-wrapper) {
-  border: 0;
-  box-shadow: none;
+@media (min-width: 768px) {
+  .hero-search-row {
+    align-items: center;
+  }
+
+  .hero-category :deep(.ant-select-selector) {
+    height: 50px;
+    box-sizing: border-box;
+  }
+
+  .hero-search {
+    height: 50px;
+    box-sizing: border-box;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .hero-category :deep(.ant-select-selection-item),
+  .hero-category :deep(.ant-select-selection-placeholder) {
+    line-height: 48px;
+  }
+
+  .hero-search :deep(.ant-input-suffix .ant-btn) {
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    min-height: auto;
+    padding-top: 30px;
+    padding-bottom: 28px;
+  }
+
+  .hero-art {
+    display: none;
+  }
+
+  .hero-search-row {
+    width: 100%;
+    max-width: 760px;
+    flex-wrap: wrap;
+  }
+
+  .hero-category,
+  .hero-search {
+    width: 100%;
+    flex-basis: 100%;
+  }
 }
 
 .hero-search :deep(.ant-input-suffix) .ant-btn {
@@ -585,6 +717,17 @@ const emptyText = computed(() =>
   margin-bottom: 20px;
   color: var(--cp-text-soft);
   font-size: 13px;
+}
+
+.load-more-status {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+  color: var(--cp-text-soft);
+  font-size: 12px;
 }
 
 @media (max-width: 767px) {

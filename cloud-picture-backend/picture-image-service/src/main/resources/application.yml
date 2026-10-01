@@ -58,3 +58,7 @@ picture:
     bucket: ${COS_BUCKET:}
     # 预览签名 URL 有效期（秒）
     sign-expire-seconds: ${COS_SIGN_EXPIRE_SECONDS:3600}
+  # Pexels 图源导入：Key 只在后端读取，不返回前端、不写入日志
+  pexels:
+    api-key: ${PEXELS_API_KEY:}
+    api-base-url: ${PEXELS_API_BASE_URL:https://api.pexels.com/v1}
