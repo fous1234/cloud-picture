@@ -8,10 +8,14 @@ import com.qcloud.cos.http.HttpMethodName;
 import com.qcloud.cos.model.GeneratePresignedUrlRequest;
 import com.qcloud.cos.model.ObjectMetadata;
 import com.qcloud.cos.model.PutObjectRequest;
+import com.qcloud.cos.model.ResponseHeaderOverrides;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -87,6 +91,43 @@ public class CosStorage {
 
     public String signedThumbnailUrl(String key) {
         return presign(key, Map.of(IMAGE_MOGR, THUMBNAIL_PARAM));
+    }
+
+    /** 下载签名：GET + 附件响应头覆盖（Content-Disposition / Content-Type），浏览器访问即另存为文件 */
+    public String signedDownloadUrl(String key, String filename) {
+        requireConfigured();
+        GeneratePresignedUrlRequest request =
+                new GeneratePresignedUrlRequest(cosConfig.getBucket(), key, HttpMethodName.GET);
+        request.setExpiration(new Date(System.currentTimeMillis() + signExpireSeconds * 1000L));
+        ResponseHeaderOverrides headers = new ResponseHeaderOverrides();
+        headers.setContentType(contentTypeOf(key));
+        headers.setContentDisposition(contentDisposition(filename));
+        request.setResponseHeaders(headers);
+        try {
+            return cosConfig.cosClient().generatePresignedUrl(request).toString();
+        } catch (CosClientException e) {
+            log.error("生成 COS 下载签名地址失败, key={}", key, e);
+            throw new BusinessException(ErrorCode.COS_ERROR, "生成图片下载地址失败");
+        }
+    }
+
+    /** 附件响应头：非 ASCII 文件名按 RFC 5987 编码，同时保留 ASCII 回退名 */
+    private static String contentDisposition(String filename) {
+        String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
+        String asciiFallback = filename.replaceAll("[^\\x20-\\x7E]", "_").replace("\\", "_").replace("\"", "_");
+        return "attachment; filename=\"" + asciiFallback + "\"; filename*=UTF-8''" + encoded;
+    }
+
+    /** 对象 Key 的扩展名决定下载响应类型，未知格式按二进制流处理 */
+    private static String contentTypeOf(String key) {
+        int dot = key.lastIndexOf('.');
+        String extension = dot < 0 ? "" : key.substring(dot + 1).toLowerCase(Locale.ROOT);
+        return switch (extension) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "webp" -> "image/webp";
+            default -> "application/octet-stream";
+        };
     }
 
     private String presign(String key, Map<String, String> parameters) {

@@ -53,7 +53,7 @@ async function submit() {
       <div class="auth-aside-copy">
         <p class="auth-kicker">COLLECTION // VOL. 08</p>
         <h1 class="auth-headline">发现灵感，<br />收藏每一刻</h1>
-        <p class="auth-desc">面向校园团队的高质量共享图库平台，摄影优先，沉淀珍贵影像资产。</p>
+        <p class="auth-desc">收万象之影，藏生活之美；随心取阅，共赏佳作。</p>
       </div>
       <div class="auth-aside-meta">
         <span>天然晨光 · 自然采撷</span>

@@ -11,9 +11,17 @@ import {
   Skeleton,
   Tag,
 } from 'ant-design-vue'
-import { ArrowLeftOutlined, DeleteOutlined, EditOutlined, SafetyCertificateOutlined } from '@ant-design/icons-vue'
+import {
+  ArrowLeftOutlined,
+  CloudDownloadOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  EditOutlined,
+  ExclamationCircleOutlined,
+  SafetyCertificateOutlined,
+} from '@ant-design/icons-vue'
 import type { ImageVO } from '../api/types'
-import { getImage } from '../api/image'
+import { downloadImage, getImage } from '../api/image'
 import { errorMessage } from '../api/http'
 import { isAdmin, session } from '../stores/session'
 import {
@@ -35,8 +43,12 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const missing = ref(false)
 const imageBroken = ref(false)
+const downloadLoading = ref(false)
+const downloadStarted = ref(false)
+const downloadError = ref<string | null>(null)
 /** 签名地址失效只自动重取一次，再失败就交给用户手动重试 */
 let refreshedOnce = false
+let downloadRequestSequence = 0
 
 const id = computed(() => String(route.params.id))
 
@@ -51,7 +63,15 @@ const canEdit = computed(() => !!image.value && isOwner(image.value))
 const canReview = computed(() => !!image.value && isAdmin() && image.value.reviewStatus !== 1)
 const canDelete = computed(() => !!image.value && (isOwner(image.value) || isAdmin()))
 
+function resetDownloadState() {
+  downloadRequestSequence++
+  downloadLoading.value = false
+  downloadStarted.value = false
+  downloadError.value = null
+}
+
 async function load() {
+  resetDownloadState()
   loading.value = true
   error.value = null
   missing.value = false
@@ -68,6 +88,36 @@ async function load() {
     }
   } finally {
     loading.value = false
+  }
+}
+
+async function onDownload() {
+  const currentImage = image.value
+  if (!currentImage || downloadLoading.value) return
+
+  const requestSequence = ++downloadRequestSequence
+  downloadLoading.value = true
+  downloadStarted.value = false
+  downloadError.value = null
+
+  try {
+    const url = await downloadImage(currentImage.id)
+    if (requestSequence !== downloadRequestSequence || id.value !== currentImage.id) return
+
+    const link = document.createElement('a')
+    link.href = url
+    link.download = ''
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    downloadStarted.value = true
+  } catch (e) {
+    if (requestSequence === downloadRequestSequence && id.value === currentImage.id) {
+      downloadError.value = errorMessage(e)
+    }
+  } finally {
+    if (requestSequence === downloadRequestSequence) downloadLoading.value = false
   }
 }
 
@@ -94,12 +144,52 @@ watch(dataVersion, load)
 
 <template>
   <div class="cp-container cp-page">
-    <Button class="back-link" type="link" @click="router.push({ name: 'gallery' })">
-      <template #icon><ArrowLeftOutlined /></template>
-      返回图库
-    </Button>
-    <div v-if="image" class="detail-breadcrumb">
-      共享图库 <span>/</span> {{ image.category || '图片' }} <span>/</span> 详情
+    <div class="detail-toolbar">
+      <div class="detail-toolbar-leading">
+        <Button class="back-link" type="link" @click="router.push({ name: 'gallery' })">
+          <template #icon><ArrowLeftOutlined /></template>
+          返回图库
+        </Button>
+        <div v-if="image" class="detail-breadcrumb">
+          共享图库 <span>/</span> {{ image.category || '图片' }} <span>/</span> 详情
+        </div>
+      </div>
+      <Button
+        v-if="image && !loading"
+        class="download-button"
+        type="primary"
+        :loading="downloadLoading"
+        :disabled="downloadLoading"
+        @click="onDownload"
+      >
+        <template #icon><DownloadOutlined /></template>
+        <span>原图下载（{{ formatSize(image.picSize) }}）</span>
+        <span class="download-available">可下载</span>
+      </Button>
+    </div>
+
+    <div
+      v-if="image && (downloadStarted || downloadError)"
+      class="download-status"
+      :class="{ 'download-status-error': !!downloadError }"
+      :role="downloadError ? 'alert' : 'status'"
+      aria-live="polite"
+    >
+      <div class="download-status-main">
+        <template v-if="downloadStarted">
+          <CloudDownloadOutlined class="download-status-icon" />
+          <span>下载已开始，浏览器正通过安全短期签名获取原图文件（{{ formatSize(image.picSize) }}）。</span>
+        </template>
+        <template v-else>
+          <ExclamationCircleOutlined class="download-status-icon" />
+          <span>原图下载失败：{{ downloadError }}</span>
+          <Button type="link" size="small" :loading="downloadLoading" @click="onDownload">重试</Button>
+        </template>
+      </div>
+      <div v-if="downloadStarted" class="download-permission">
+        <SafetyCertificateOutlined />
+        <span>原图权限已由后端校验</span>
+      </div>
     </div>
 
     <div v-if="loading" class="detail">
@@ -245,15 +335,33 @@ watch(dataVersion, load)
 </template>
 
 <style scoped>
+.detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.detail-toolbar-leading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
 .back-link {
   padding-left: 0;
-  margin-bottom: 8px;
+  flex: 0 0 auto;
   color: var(--cp-text-soft);
   font-size: 12px;
 }
 
 .detail-breadcrumb {
-  margin-bottom: 20px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--cp-text-muted);
   font-size: 11px;
 }
@@ -261,6 +369,64 @@ watch(dataVersion, load)
 .detail-breadcrumb span {
   padding: 0 6px;
   color: var(--cp-border);
+}
+
+.download-button {
+  flex: 0 0 auto;
+  border-radius: var(--cp-radius);
+}
+
+.download-available {
+  margin-left: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--cp-status-approved-bg);
+  color: var(--cp-text);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.download-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  background: var(--cp-surface);
+  font-size: 12px;
+}
+
+.download-status-main,
+.download-permission {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.download-status-icon,
+.download-permission {
+  color: var(--cp-status-approved-fg);
+}
+
+.download-status-error {
+  border-color: var(--cp-status-rejected-border);
+  background: var(--cp-status-rejected-bg);
+  color: var(--cp-status-rejected-fg);
+}
+
+.download-status-error .download-status-icon {
+  color: var(--cp-status-rejected-fg);
+}
+
+.download-permission {
+  flex: 0 0 auto;
+  color: var(--cp-text-soft);
+  font-size: 11px;
 }
 
 .detail {
@@ -418,6 +584,29 @@ watch(dataVersion, load)
 }
 
 @media (max-width: 575px) {
+  .detail-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .detail-toolbar-leading {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .download-button {
+    width: 100%;
+  }
+
+  .download-status {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .download-permission {
+    padding-left: 26px;
+  }
+
   .detail-media {
     min-height: 240px;
   }

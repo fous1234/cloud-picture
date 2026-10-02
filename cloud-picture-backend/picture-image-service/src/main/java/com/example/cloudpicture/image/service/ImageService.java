@@ -22,5 +22,7 @@ public interface ImageService {
 
     boolean deleteImage(Long id);
 
+    String download(Long id);
+
     List<String> listTagNames(int limit);
 }
