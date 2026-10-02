@@ -236,7 +236,7 @@ const emptyText = computed(() =>
           <p class="hero-kicker">EDITORIAL CURATION <span>·</span> 灵感收录</p>
           <h1 class="hero-title">发现灵感，收藏每一刻</h1>
           <p class="hero-subtitle">
-            浏览团队共享的高质量摄影图片与创意灵感，支持按分类与标签快速检索。
+            记录生活中的精彩瞬间，随时获取心仪影像，分享更多影像灵感。
           </p>
           <div class="hero-search-row">
             <Select

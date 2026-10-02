@@ -48,12 +48,12 @@ async function submit() {
     <section class="auth-aside">
       <div class="auth-aside-top">
         <span>云图集 <span class="auth-slash">/</span> ARCHIVE</span>
-        <span>ARCHIVE COLLECTIVE</span>
+        <span>OPEN IMAGE ARCHIVE</span>
       </div>
       <div class="auth-aside-copy">
-        <p class="auth-kicker">A CREATIVE CAMPUS ARCHIVE</p>
-        <h1 class="auth-headline">加入云图库团队</h1>
-        <p class="auth-desc">让影像与灵感，在校园团队中共同沉淀。</p>
+        <p class="auth-kicker">A CREATIVE IMAGE ARCHIVE</p>
+        <h1 class="auth-headline">收万象之影，藏生活之美</h1>
+        <p class="auth-desc">随心上传与浏览图片，让每一次记录都值得被看见。</p>
       </div>
       <div class="auth-aside-meta">
         <span>HIGH-RES ASSETS</span>
@@ -67,8 +67,8 @@ async function submit() {
         <div class="auth-mobile-brand">
           <img src="/assets/cloud-picture-logo-stitch.png" alt="云图库" />
         </div>
-        <h2 class="auth-title">创建团队账号</h2>
-        <p class="auth-subtitle">加入校园共享图库，开启影像上传与灵感探索</p>
+        <h2 class="auth-title">创建账号</h2>
+        <p class="auth-subtitle">加入共享图库，开启影像上传与灵感探索</p>
 
         <Alert
           v-if="errorText"
@@ -104,7 +104,7 @@ async function submit() {
             <Input
               v-model:value="form.userName"
               size="large"
-              placeholder="例如：林同学 / 摄影社成员"
+              placeholder="例如：张三 / 李四"
               :maxlength="32"
             />
           </FormItem>

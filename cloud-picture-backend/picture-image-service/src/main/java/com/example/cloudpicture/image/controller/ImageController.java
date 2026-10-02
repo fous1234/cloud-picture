@@ -62,6 +62,11 @@ public class ImageController {
         return ApiResponse.success(imageService.getImageById(id));
     }
 
+    @GetMapping("/{id}/download")
+    public ApiResponse<String> download(@PathVariable("id") Long id) {
+        return ApiResponse.success(imageService.download(id));
+    }
+
     @PutMapping
     public ApiResponse<Boolean> updateImage(@Valid @RequestBody ImageUpdateRequest request) {
         return ApiResponse.success(imageService.updateImage(request));

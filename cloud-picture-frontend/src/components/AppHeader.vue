@@ -30,7 +30,7 @@ watch(
 )
 
 const navLinks = computed(() => {
-  const links = [{ name: 'gallery', label: '图库' }]
+  const links = [{ name: 'gallery', label: '共享图库' }]
   if (isAdmin()) {
     links.push({ name: 'admin-images', label: '图片审核' })
     links.push({ name: 'admin-users', label: '用户管理' })
@@ -174,7 +174,7 @@ async function handleLogout() {
     <nav v-if="isLoggedIn()" class="mobile-tabbar" aria-label="移动端导航">
       <RouterLink :to="{ name: 'gallery' }" class="mobile-tab">
         <AppstoreOutlined />
-        <span>图库</span>
+        <span>共享图库</span>
       </RouterLink>
       <RouterLink v-if="isAdmin()" :to="{ name: 'admin-images' }" class="mobile-tab">
         <PictureOutlined />

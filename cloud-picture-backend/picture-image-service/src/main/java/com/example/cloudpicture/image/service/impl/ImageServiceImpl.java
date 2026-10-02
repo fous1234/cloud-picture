@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
@@ -45,6 +46,8 @@ public class ImageServiceImpl implements ImageService {
     private static final int HEADER_LENGTH = 12;
     private static final String KEY_PREFIX = "picture/";
     private static final int MAX_NAME_LENGTH = 256;
+    /** 路径分隔符、控制字符及 Windows 文件名非法字符 */
+    private static final Pattern ILLEGAL_FILENAME_CHARS = Pattern.compile("[\\\\/:*?\"<>|\\p{Cntrl}]");
 
     private final ImageMapper imageMapper;
     private final ImageTagMapper imageTagMapper;
@@ -185,6 +188,34 @@ public class ImageServiceImpl implements ImageService {
             imageTagMapper.decreaseTags(image.tagList());
         }
         return deleted;
+    }
+
+    public String download(Long id) {
+        Image image = imageMapper.selectById(id);
+        if (image == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "图片不存在");
+        }
+        CurrentUser currentUser = CurrentUser.get();
+        boolean owner = currentUser != null && currentUser.getId().equals(image.getOwnerId());
+        boolean admin = currentUser != null && currentUser.isAdmin();
+        // 未通过审核的图片对外统一表现为不存在，避免泄露资源状态
+        if (image.getReviewStatus() != Image.REVIEW_PASSED && !owner && !admin) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "图片不存在");
+        }
+        return cosStorage.signedDownloadUrl(image.getCosKey(), downloadFilename(image));
+    }
+
+    /** 下载文件名：清理非法字符，仅保留与 picFormat 匹配的扩展名；名称为空时用 image-{id}.{picFormat} */
+    private static String downloadFilename(Image image) {
+        String name = image.getName() == null ? "" : ILLEGAL_FILENAME_CHARS.matcher(image.getName()).replaceAll("").trim();
+        if (name.isEmpty()) {
+            return "image-" + image.getId() + "." + image.getPicFormat();
+        }
+        int dot = name.lastIndexOf('.');
+        String format = image.getPicFormat();
+        boolean hasMatchingExtension = dot > 0 && dot < name.length() - 1
+                && name.substring(dot + 1).equalsIgnoreCase(format);
+        return hasMatchingExtension ? name : name + "." + format;
     }
 
     public List<String> listTagNames(int limit) {

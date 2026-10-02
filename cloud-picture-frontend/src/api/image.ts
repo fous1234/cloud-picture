@@ -23,6 +23,10 @@ export function getImage(id: Id): Promise<ImageVO> {
   return get<ImageVO>(`/image/${id}`)
 }
 
+export function downloadImage(id: Id): Promise<string> {
+  return get<string>(`/image/${id}/download`)
+}
+
 export function updateImage(payload: { id: Id } & ImageMeta): Promise<boolean> {
   return put<boolean>('/image', payload)
 }
