@@ -54,6 +54,28 @@ export interface ImageVO {
   owner: UserBrief | null
 }
 
+export interface ImageShareVO {
+  enabled: boolean
+  token: string | null
+}
+
+export interface SharedImageVO {
+  id: Id
+  url: string
+  name: string | null
+  introduction: string | null
+  category: string | null
+  tags: string[]
+  picSize: number | null
+  picWidth: number | null
+  picHeight: number | null
+  picFormat: string | null
+  source: 'LOCAL' | 'PEXELS' | null
+  sourcePageUrl: string | null
+  photographer: string | null
+  photographerUrl: string | null
+}
+
 export interface UserVO {
   id: Id
   account: string
@@ -83,5 +105,6 @@ export interface ImageQuery extends PageQuery {
   name?: string
   category?: string
   tag?: string
+  randomSeed?: number
   reviewStatus?: ReviewStatus
 }

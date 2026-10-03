@@ -71,6 +71,9 @@ public class Image {
     /** 摄影师主页地址 */
     private String photographerUrl;
 
+    /** 分享 token，NULL 表示当前没有有效分享链接 */
+    private String shareToken;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;

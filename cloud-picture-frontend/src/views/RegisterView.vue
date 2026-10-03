@@ -44,7 +44,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="auth-page">
+  <div class="auth-page auth-page-register">
     <section class="auth-aside">
       <div class="auth-aside-top">
         <span>云图集 <span class="auth-slash">/</span> ARCHIVE</span>
@@ -63,7 +63,7 @@ async function submit() {
     </section>
 
     <section class="auth-main">
-      <div class="auth-card">
+      <div class="auth-card auth-card-register">
         <div class="auth-mobile-brand">
           <img src="/assets/cloud-picture-logo-stitch.png" alt="云图库" />
         </div>
@@ -284,16 +284,57 @@ async function submit() {
   text-align: center;
 }
 
+.auth-card-register .auth-mobile-brand {
+  margin-bottom: 16px;
+}
+
+.auth-card-register .auth-subtitle {
+  margin-bottom: 16px;
+}
+
+.auth-card-register :deep(.ant-form-item) {
+  margin-bottom: 14px;
+}
+
+.auth-card-register :deep(.ant-form-item-label) {
+  padding-bottom: 4px;
+}
+
+.auth-card-register :deep(.ant-btn-lg) {
+  margin-top: 4px;
+}
+
+.auth-card-register .auth-switch {
+  margin-top: 14px;
+}
+
+.auth-card-register .auth-footer {
+  margin-top: 20px;
+}
+
 .auth-card :deep(.ant-form-item-label > label) {
   font-size: 13px;
   font-weight: 600;
 }
 
-.auth-card :deep(.ant-input-affix-wrapper),
-.auth-card :deep(.ant-input) {
+.auth-card :deep(.ant-form-item-control-input-content > .ant-input),
+.auth-card :deep(.ant-input-affix-wrapper) {
+  box-sizing: border-box;
+  height: 46px;
   min-height: 46px;
   border-color: var(--cp-border);
   background: var(--cp-bg-soft);
+}
+
+.auth-card :deep(.ant-input-affix-wrapper) {
+  padding: 0 11px;
+}
+
+.auth-card :deep(.ant-input-affix-wrapper .ant-input) {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .auth-card :deep(.ant-btn-lg) {
@@ -314,6 +355,11 @@ async function submit() {
   .auth-mobile-brand {
     display: block;
   }
+
+  .auth-page-register .auth-main {
+    align-items: flex-start;
+    padding: 24px 32px;
+  }
 }
 
 @media (max-width: 575px) {
@@ -324,6 +370,10 @@ async function submit() {
 
   .auth-mobile-brand {
     margin-bottom: 36px;
+  }
+
+  .auth-page-register .auth-main {
+    padding: 24px;
   }
 }
 </style>

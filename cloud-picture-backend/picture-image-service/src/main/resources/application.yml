@@ -43,6 +43,9 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 picture:
+  auth:
+    # 免登录请求白名单，格式为 "METHOD /path"，多个用逗号分隔；仅公开分享读取
+    public-requests: "GET /image/share/**"
   session:
     ttl-seconds: ${SESSION_TTL_SECONDS:604800}
   upload:

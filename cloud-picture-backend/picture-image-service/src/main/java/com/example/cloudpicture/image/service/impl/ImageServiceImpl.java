@@ -10,7 +10,9 @@ import com.example.cloudpicture.common.security.context.CurrentUser;
 import com.example.cloudpicture.image.dto.request.ImageQueryRequest;
 import com.example.cloudpicture.image.dto.request.ImageUpdateRequest;
 import com.example.cloudpicture.image.dto.request.ImageUploadRequest;
+import com.example.cloudpicture.image.dto.response.ImageShareVO;
 import com.example.cloudpicture.image.dto.response.ImageVO;
+import com.example.cloudpicture.image.dto.response.SharedImageVO;
 import com.example.cloudpicture.image.entity.Image;
 import com.example.cloudpicture.image.mapper.ImageMapper;
 import com.example.cloudpicture.image.mapper.ImageTagMapper;
@@ -19,7 +21,9 @@ import com.example.cloudpicture.image.service.ImageService;
 import com.example.cloudpicture.image.service.UploaderFiller;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -44,6 +48,9 @@ public class ImageServiceImpl implements ImageService {
     /** JDK ImageIO 能读尺寸的格式；WebP 无内置解码器，只能靠文件头魔数校验 */
     private static final Set<String> DIMENSION_READABLE_FORMATS = Set.of("jpg", "jpeg", "png");
     private static final int HEADER_LENGTH = 12;
+    /** 分享 token 随机字节数：编码后 43 字符，不能由图片 ID 推导 */
+    private static final int SHARE_TOKEN_BYTES = 32;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String KEY_PREFIX = "picture/";
     private static final int MAX_NAME_LENGTH = 256;
     /** 路径分隔符、控制字符及 Windows 文件名非法字符 */
@@ -216,6 +223,63 @@ public class ImageServiceImpl implements ImageService {
         boolean hasMatchingExtension = dot > 0 && dot < name.length() - 1
                 && name.substring(dot + 1).equalsIgnoreCase(format);
         return hasMatchingExtension ? name : name + "." + format;
+    }
+
+    public ImageShareVO getShare(Long id) {
+        Image image = requireOwnedImage(id);
+        return new ImageShareVO(StringUtils.hasText(image.getShareToken()), image.getShareToken());
+    }
+
+    public ImageShareVO createShare(Long id) {
+        Image image = requireOwnedImage(id);
+        if (image.getReviewStatus() != Image.REVIEW_PASSED) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "图片不存在");
+        }
+        String token = generateShareToken();
+        // 覆盖旧 token，旧链接立即失效；NULL 字段走 set 显式写入
+        imageMapper.update(null, new LambdaUpdateWrapper<Image>()
+                .eq(Image::getId, id)
+                .set(Image::getShareToken, token));
+        return new ImageShareVO(true, token);
+    }
+
+    public boolean revokeShare(Long id) {
+        requireOwnedImage(id);
+        return imageMapper.update(null, new LambdaUpdateWrapper<Image>()
+                .eq(Image::getId, id)
+                .set(Image::getShareToken, (Object) null)) > 0;
+    }
+
+    public SharedImageVO getSharedImage(String token) {
+        if (!StringUtils.hasText(token)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "分享不存在");
+        }
+        Image image = imageMapper.selectOne(new LambdaQueryWrapper<Image>()
+                .eq(Image::getShareToken, token));
+        // 无效、已撤销、已删除或审核状态不再通过，统一表现为不存在
+        if (image == null || image.getReviewStatus() != Image.REVIEW_PASSED) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "分享不存在");
+        }
+        return SharedImageVO.from(image, cosStorage.signedUrl(image.getCosKey()));
+    }
+
+    /** 仅图片所有者可管理自己的分享链接；不存在或非所有者统一 404，不泄露资源状态 */
+    private Image requireOwnedImage(Long id) {
+        Long ownerId = CurrentUser.get().getId();
+        Image image = imageMapper.selectOne(new LambdaQueryWrapper<Image>()
+                .eq(Image::getId, id)
+                .eq(Image::getOwnerId, ownerId));
+        if (image == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "图片不存在或无权操作");
+        }
+        return image;
+    }
+
+    /** 32 字节安全随机 → 无填充 Base64 URL 字符串（43 字符） */
+    private static String generateShareToken() {
+        byte[] bytes = new byte[SHARE_TOKEN_BYTES];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     public List<String> listTagNames(int limit) {

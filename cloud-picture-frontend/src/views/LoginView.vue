@@ -256,11 +256,24 @@ async function submit() {
   font-weight: 600;
 }
 
-.auth-card :deep(.ant-input-affix-wrapper),
-.auth-card :deep(.ant-input) {
+.auth-card :deep(.ant-form-item-control-input-content > .ant-input),
+.auth-card :deep(.ant-input-affix-wrapper) {
+  box-sizing: border-box;
+  height: 46px;
   min-height: 46px;
   border-color: var(--cp-border);
   background: var(--cp-bg-soft);
+}
+
+.auth-card :deep(.ant-input-affix-wrapper) {
+  padding: 0 11px;
+}
+
+.auth-card :deep(.ant-input-affix-wrapper .ant-input) {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .auth-card :deep(.ant-btn-lg) {

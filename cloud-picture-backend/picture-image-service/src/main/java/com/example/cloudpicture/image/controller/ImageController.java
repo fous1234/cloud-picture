@@ -5,7 +5,9 @@ import com.example.cloudpicture.common.api.PageData;
 import com.example.cloudpicture.image.dto.request.ImageQueryRequest;
 import com.example.cloudpicture.image.dto.request.ImageUpdateRequest;
 import com.example.cloudpicture.image.dto.request.ImageUploadRequest;
+import com.example.cloudpicture.image.dto.response.ImageShareVO;
 import com.example.cloudpicture.image.dto.response.ImageVO;
+import com.example.cloudpicture.image.dto.response.SharedImageVO;
 import com.example.cloudpicture.image.service.ImageService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -65,6 +67,27 @@ public class ImageController {
     @GetMapping("/{id}/download")
     public ApiResponse<String> download(@PathVariable("id") Long id) {
         return ApiResponse.success(imageService.download(id));
+    }
+
+    /** 免登录读取分享内容，只返回审核通过图片的公开字段 */
+    @GetMapping("/share/{token}")
+    public ApiResponse<SharedImageVO> getSharedImage(@PathVariable("token") String token) {
+        return ApiResponse.success(imageService.getSharedImage(token));
+    }
+
+    @GetMapping("/{id}/share")
+    public ApiResponse<ImageShareVO> getShare(@PathVariable("id") Long id) {
+        return ApiResponse.success(imageService.getShare(id));
+    }
+
+    @PostMapping("/{id}/share")
+    public ApiResponse<ImageShareVO> createShare(@PathVariable("id") Long id) {
+        return ApiResponse.success(imageService.createShare(id));
+    }
+
+    @DeleteMapping("/{id}/share")
+    public ApiResponse<Boolean> revokeShare(@PathVariable("id") Long id) {
+        return ApiResponse.success(imageService.revokeShare(id));
     }
 
     @PutMapping

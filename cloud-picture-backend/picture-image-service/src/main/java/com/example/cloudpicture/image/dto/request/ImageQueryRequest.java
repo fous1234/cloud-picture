@@ -23,15 +23,23 @@ public class ImageQueryRequest {
 
     private String tag;
 
+    /** 公开图库无筛选时使用的稳定随机种子；未传时按上传时间倒序。 */
+    private Long randomSeed;
+
     /** 仅管理员使用，0 待审核 / 1 通过 / 2 拒绝 */
     private Integer reviewStatus;
 
     public LambdaQueryWrapper<Image> toQueryWrapper() {
-        return new LambdaQueryWrapper<Image>()
+        LambdaQueryWrapper<Image> wrapper = new LambdaQueryWrapper<Image>()
                 .like(StringUtils.hasText(name), Image::getName, name)
                 .eq(StringUtils.hasText(category), Image::getCategory, category)
                 .like(StringUtils.hasText(tag), Image::getTags, tag)
-                .eq(reviewStatus != null, Image::getReviewStatus, reviewStatus)
-                .orderByDesc(Image::getCreateTime);
+                .eq(reviewStatus != null, Image::getReviewStatus, reviewStatus);
+        if (randomSeed != null) {
+            wrapper.last("ORDER BY RAND(" + randomSeed + ")");
+        } else {
+            wrapper.orderByDesc(Image::getCreateTime);
+        }
+        return wrapper;
     }
 }
