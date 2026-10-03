@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Input, Select, Spin, Tag } from 'ant-design-vue'
-import { SearchOutlined } from '@ant-design/icons-vue'
+import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import type { ImageVO } from '../api/types'
 import { listImages, listTags } from '../api/image'
 import { errorMessage } from '../api/http'
@@ -29,11 +29,16 @@ const tagsFailed = ref(false)
 const keyword = ref('')
 const loadMoreTarget = ref<HTMLElement | null>(null)
 const supportsObserver = ref(false)
+const randomSeed = ref(newRandomSeed())
 
 /** 防止乱序响应覆盖较新的搜索结果 */
 let requestSeq = 0
 let nextPage = 1
 let loadObserver: IntersectionObserver | undefined
+
+function newRandomSeed() {
+  return Math.floor(Math.random() * 2147483647)
+}
 
 function readQuery() {
   const query = route.query
@@ -47,8 +52,7 @@ function readQuery() {
 
 const filters = computed(() => readQuery())
 const hasFilters = computed(() => !!(filters.value.q || filters.value.category || filters.value.tag))
-const searchMode = ref(hasFilters.value)
-const showSearchResults = computed(() => searchMode.value || hasFilters.value)
+const showSearchResults = computed(() => route.query.view === 'search' || hasFilters.value)
 
 async function loadImages() {
   const { q, category, tag } = readQuery()
@@ -62,12 +66,14 @@ async function loadImages() {
   images.value = []
   total.value = 0
   try {
+    const random = !q && !category && !tag ? randomSeed.value : undefined
     const page = await listImages({
       current: nextPage,
       size: DEFAULT_PAGE_SIZE,
       name: q,
       category,
       tag,
+      randomSeed: random,
     })
     if (seq !== requestSeq) return
     images.value = page.records ?? []
@@ -95,12 +101,14 @@ async function loadMore() {
   loadingMore.value = true
   moreError.value = null
   try {
+    const random = !q && !category && !tag ? randomSeed.value : undefined
     const page = await listImages({
       current: nextPage,
       size: DEFAULT_PAGE_SIZE,
       name: q,
       category,
       tag,
+      randomSeed: random,
     })
     if (seq !== requestSeq) return
     const knownIds = new Set(images.value.map((image) => image.id))
@@ -175,11 +183,10 @@ watch(keyword, (value) => {
   }, 400)
 })
 
-/** 把筛选状态写入 URL（默认值不写入，保持地址可读） */
+/** 把搜索模式和筛选状态写入 URL */
 function applyQuery(patch: Record<string, string | undefined>) {
-  searchMode.value = true
   const merged = { ...readQuery(), ...patch }
-  const query: Record<string, string> = {}
+  const query: Record<string, string> = { view: 'search' }
   if (merged.q) query.q = merged.q
   if (merged.category) query.category = merged.category
   if (merged.tag) query.tag = merged.tag
@@ -199,15 +206,21 @@ function toggleTag(tag: string) {
 }
 
 function clearFilters() {
-  searchMode.value = true
   keyword.value = ''
-  router.push({ name: 'gallery' })
+  randomSeed.value = newRandomSeed()
+  router.push({ name: 'gallery', query: { view: 'search' } })
 }
 
 function showGalleryHome() {
-  searchMode.value = false
   keyword.value = ''
+  randomSeed.value = newRandomSeed()
   router.push({ name: 'gallery' })
+}
+
+function refreshGallery() {
+  if (loading.value || loadingMore.value) return
+  randomSeed.value = newRandomSeed()
+  loadImages()
 }
 
 function usable(image: ImageVO) {
@@ -318,7 +331,18 @@ const emptyText = computed(() =>
           <p class="section-kicker">CAMPUS PHOTO COLLECTION</p>
           <h2>共享图库</h2>
         </div>
-        <span class="toolbar-count">共 {{ total }} 张图片</span>
+        <div class="gallery-tools">
+          <span class="gallery-count">
+            <span class="gallery-count-dot"></span>
+            <span class="gallery-count-label">已收录</span>
+            <strong>{{ total }}</strong>
+            <span class="gallery-count-label">件摄影作品</span>
+          </span>
+          <Button class="refresh-gallery-btn" :loading="loading" @click="refreshGallery">
+            <template #icon><ReloadOutlined /></template>
+            刷新列表
+          </Button>
+        </div>
       </div>
 
       <div v-if="!showSearchResults" class="category-strip" aria-label="图片分类">
@@ -725,9 +749,60 @@ const emptyText = computed(() =>
 }
 
 .toolbar-count {
-  margin-left: auto;
   color: var(--cp-text-soft);
   font-size: 13px;
+}
+
+.gallery-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gallery-count,
+.refresh-gallery-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-bg-soft);
+  color: var(--cp-text-soft);
+  font-size: 12px;
+}
+
+.gallery-count-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6f9b85;
+}
+
+.gallery-count strong {
+  color: var(--cp-text);
+  font-weight: 600;
+}
+
+.refresh-gallery-btn {
+  background: var(--cp-bg);
+  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.06);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.refresh-gallery-btn:hover {
+  border-color: var(--cp-border);
+  background: var(--cp-bg-soft);
+  color: var(--cp-text);
+}
+
+.refresh-gallery-btn :deep(.anticon) {
+  transition: transform 0.3s ease;
+}
+
+.refresh-gallery-btn:hover :deep(.anticon) {
+  transform: rotate(180deg);
 }
 
 .tags-block {
@@ -895,6 +970,10 @@ const emptyText = computed(() =>
 
   .gallery-section-head {
     align-items: flex-start;
+  }
+
+  .gallery-tools {
+    align-items: center;
   }
 
   .gallery-section-head .toolbar-count {

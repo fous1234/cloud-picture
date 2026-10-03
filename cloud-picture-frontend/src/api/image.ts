@@ -1,5 +1,5 @@
-import type { Id, ImageQuery, ImageVO, PageData } from './types'
-import { del, get, postForm, put } from './http'
+import type { Id, ImageQuery, ImageShareVO, ImageVO, PageData, SharedImageVO } from './types'
+import { del, get, post, postForm, put } from './http'
 import { rememberOwners } from '../stores/ui'
 
 export interface ImageMeta {
@@ -25,6 +25,22 @@ export function getImage(id: Id): Promise<ImageVO> {
 
 export function downloadImage(id: Id): Promise<string> {
   return get<string>(`/image/${id}/download`)
+}
+
+export function getImageShare(id: Id): Promise<ImageShareVO> {
+  return get<ImageShareVO>(`/image/${id}/share`)
+}
+
+export function createImageShare(id: Id): Promise<ImageShareVO> {
+  return post<ImageShareVO>(`/image/${id}/share`)
+}
+
+export function revokeImageShare(id: Id): Promise<boolean> {
+  return del<boolean>(`/image/${id}/share`)
+}
+
+export function getSharedImage(token: string): Promise<SharedImageVO> {
+  return get<SharedImageVO>(`/image/share/${encodeURIComponent(token)}`)
 }
 
 export function updateImage(payload: { id: Id } & ImageMeta): Promise<boolean> {

@@ -39,6 +39,11 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'share/:token',
+        name: 'image-share',
+        component: () => import('../views/SharedImageView.vue'),
+      },
+      {
         path: 'image/:id',
         name: 'image-detail',
         component: () => import('../views/ImageDetailView.vue'),
