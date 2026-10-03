@@ -23,6 +23,7 @@
         <module>picture-gateway</module>
         <module>picture-user-service</module>
         <module>picture-image-service</module>
+        <module>picture-ai-service</module>
     </modules>
 
     <properties>
