@@ -31,9 +31,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class CosStorage {
 
     private static final int THUMBNAIL_SIZE = 300;
+    private static final int MEDIUM_SIZE = 1200;
     /** COS 图片处理参数，形如 ?imageMogr2/thumbnail/300x300> */
     private static final String IMAGE_MOGR = "imageMogr2";
     private static final String THUMBNAIL_PARAM = "thumbnail/" + THUMBNAIL_SIZE + "x" + THUMBNAIL_SIZE + ">";
+    private static final String MEDIUM_PARAM = "thumbnail/" + MEDIUM_SIZE + "x" + MEDIUM_SIZE + ">";
 
     private final CosConfig cosConfig;
     private final long signExpireSeconds;
@@ -91,6 +93,10 @@ public class CosStorage {
 
     public String signedThumbnailUrl(String key) {
         return presign(key, Map.of(IMAGE_MOGR, THUMBNAIL_PARAM));
+    }
+
+    public String signedMediumUrl(String key) {
+        return presign(key, Map.of(IMAGE_MOGR, MEDIUM_PARAM));
     }
 
     /** 下载签名：GET + 附件响应头覆盖（Content-Disposition / Content-Type），浏览器访问即另存为文件 */

@@ -8,6 +8,7 @@ import { openEdit, openReview, REVIEW_STATUS_COLOR, REVIEW_STATUS_TEXT } from '.
 
 const props = defineProps<{
   image: ImageVO
+  imageOnly?: boolean
   showStatus?: boolean
   canEdit?: boolean
   canDelete?: boolean
@@ -26,14 +27,17 @@ const aspectRatio = computed(() => {
 
 const visibleTags = computed(() => (props.image.tags ?? []).slice(0, 3))
 const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.canReview))
+const imageUrl = computed(() =>
+  props.imageOnly ? props.image.mediumUrl || props.image.thumbnailUrl : props.image.thumbnailUrl,
+)
 </script>
 
 <template>
-  <article class="card" :class="{ 'card-with-status': showStatus }">
+  <article class="card" :class="{ 'card-with-status': showStatus, 'card-image-only': imageOnly }">
     <RouterLink :to="`/image/${image.id}`" class="card-media" :style="{ aspectRatio }">
       <img
-        v-if="image.thumbnailUrl && !broken"
-        :src="image.thumbnailUrl"
+        v-if="imageUrl && !broken"
+        :src="imageUrl"
         :alt="image.name || '图片预览'"
         loading="lazy"
         decoding="async"
@@ -41,7 +45,7 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
       />
       <div v-else class="card-media-fallback">图片加载失败</div>
 
-      <div v-if="hasActions" class="card-overlay">
+      <div v-if="!imageOnly && hasActions" class="card-overlay">
         <Tooltip v-if="canEdit" title="编辑信息">
           <Button
             shape="circle"
@@ -76,7 +80,7 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
       </div>
 
       <Tag
-        v-if="showStatus"
+        v-if="!imageOnly && showStatus"
         class="card-status"
         :color="REVIEW_STATUS_COLOR[image.reviewStatus]"
       >
@@ -84,7 +88,7 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
       </Tag>
     </RouterLink>
 
-    <div class="card-body">
+    <div v-if="!imageOnly" class="card-body">
       <RouterLink :to="`/image/${image.id}`" class="card-title">
         {{ image.name || '未命名图片' }}
       </RouterLink>
@@ -142,6 +146,17 @@ const hasActions = computed(() => !!(props.canEdit || props.canDelete || props.c
 
 .card:hover {
   box-shadow: 0 8px 24px rgba(17, 24, 39, 0.06);
+}
+
+.card-image-only {
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--cp-radius-lg);
+  box-shadow: none;
+}
+
+.card-image-only:hover {
+  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.08);
 }
 
 .card-media {

@@ -3,6 +3,7 @@ package com.example.cloudpicture.ai.service;
 import com.example.cloudpicture.ai.dto.response.ImageMetadataVO;
 import com.example.cloudpicture.common.exception.BusinessException;
 import com.example.cloudpicture.common.exception.ErrorCode;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -64,9 +65,9 @@ final class ModelResponseParser {
         if (content == null || content.isBlank()) {
             throw unavailable();
         }
-        try {
-            JsonNode root = MAPPER.readTree(content);
-            if (root == null || !root.isObject()) {
+        try (JsonParser parser = MAPPER.getFactory().createParser(content)) {
+            JsonNode root = MAPPER.readTree(parser);
+            if (root == null || !root.isObject() || parser.nextToken() != null) {
                 throw unavailable();
             }
             return root;

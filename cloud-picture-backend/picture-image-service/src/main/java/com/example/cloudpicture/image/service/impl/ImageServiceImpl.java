@@ -120,7 +120,7 @@ public class ImageServiceImpl implements ImageService {
         LambdaQueryWrapper<Image> wrapper = request.toQueryWrapper()
                 .eq(Image::getReviewStatus, Image.REVIEW_PASSED);
         Page<Image> page = imageMapper.selectPage(Page.of(request.getCurrent(), request.getSize()), wrapper);
-        List<ImageVO> records = page.getRecords().stream().map(this::toVO).toList();
+        List<ImageVO> records = page.getRecords().stream().map(this::toGalleryVO).toList();
         uploaderFiller.fillOwners(records);
         return PageData.of(records, page.getTotal(), page.getCurrent(), page.getSize());
     }
@@ -289,6 +289,12 @@ public class ImageServiceImpl implements ImageService {
     private ImageVO toVO(Image image) {
         return ImageVO.from(image, cosStorage.signedUrl(image.getCosKey()),
                 cosStorage.signedThumbnailUrl(image.getCosKey()));
+    }
+
+    private ImageVO toGalleryVO(Image image) {
+        ImageVO vo = toVO(image);
+        vo.setMediumUrl(cosStorage.signedMediumUrl(image.getCosKey()));
+        return vo;
     }
 
     private String validateAndGetFormat(MultipartFile file) {

@@ -7,12 +7,12 @@ import type { ImageVO } from '../api/types'
 import { listImages, listTags } from '../api/image'
 import { errorMessage } from '../api/http'
 import ImageGrid from '../components/ImageGrid.vue'
-import { isAdmin } from '../stores/session'
-import { CATEGORY_OPTIONS, dataVersion, openUpload } from '../stores/ui'
-import { confirmDeleteImage, isOwner } from '../utils/imageActions'
+import { CATEGORY_OPTIONS, openUpload } from '../stores/ui'
 
 const route = useRoute()
 const router = useRouter()
+
+defineOptions({ name: 'GalleryView' })
 
 const DEFAULT_PAGE_SIZE = 12
 
@@ -35,6 +35,7 @@ const randomSeed = ref(newRandomSeed())
 let requestSeq = 0
 let nextPage = 1
 let loadObserver: IntersectionObserver | undefined
+let loadedQueryKey: string | null = null
 
 function newRandomSeed() {
   return Math.floor(Math.random() * 2147483647)
@@ -57,6 +58,7 @@ const showSearchResults = computed(() => route.query.view === 'search' || hasFil
 async function loadImages() {
   const { q, category, tag } = readQuery()
   const seq = ++requestSeq
+  loadedQueryKey = JSON.stringify({ q, category, tag, view: route.query.view })
   nextPage = 1
   loading.value = true
   loadingMore.value = false
@@ -161,8 +163,17 @@ async function loadTags() {
   }
 }
 
-watch(() => route.query, loadImages, { immediate: true })
-watch(dataVersion, loadImages)
+watch(
+  () => route.query,
+  () => {
+    if (route.name !== 'gallery') return
+    const { q, category, tag } = readQuery()
+    const queryKey = JSON.stringify({ q, category, tag, view: route.query.view })
+    if (queryKey === loadedQueryKey) return
+    loadImages()
+  },
+  { immediate: true },
+)
 watch(
   () => route.query.q,
   (value) => {
@@ -221,14 +232,6 @@ function refreshGallery() {
   if (loading.value || loadingMore.value) return
   randomSeed.value = newRandomSeed()
   loadImages()
-}
-
-function usable(image: ImageVO) {
-  return isOwner(image) || isAdmin()
-}
-
-function onDelete(image: ImageVO) {
-  confirmDeleteImage(image, loadImages)
 }
 
 function retryLoadMore() {
@@ -420,11 +423,8 @@ const emptyText = computed(() =>
           :error="error"
           :images="images"
           :empty-text="emptyText"
-          :can-edit="usable"
-          :can-delete="usable"
-          :can-review="() => isAdmin()"
+          image-only
           @retry="loadImages"
-          @delete="onDelete"
         >
           <template #empty-action>
             <Button v-if="!showSearchResults" type="primary" @click="openUpload">上传图片</Button>

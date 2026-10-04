@@ -34,6 +34,8 @@ export interface ImageVO {
   /** 短期签名预览地址，随每次响应变化，不做本地长期缓存 */
   url: string | null
   thumbnailUrl: string | null
+  /** 共享图库列表使用的中等尺寸短期签名地址；其他响应可为空 */
+  mediumUrl: string | null
   name: string | null
   introduction: string | null
   category: string | null

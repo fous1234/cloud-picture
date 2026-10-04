@@ -13,6 +13,8 @@ public class ImageVO {
     private String url;
     /** 带 COS 图片处理参数的短期签名缩略图地址 */
     private String thumbnailUrl;
+    /** 共享图库列表使用的中等尺寸短期签名图片地址 */
+    private String mediumUrl;
     private String name;
     private String introduction;
     private String category;

@@ -66,8 +66,7 @@ export function uploadImage(
   return postForm<ImageVO>('/image/upload', form, onProgress)
 }
 
-// 「我的上传」依赖后端新增按当前用户过滤的分页接口，后端当前未实现该端点；
-// 这里只按 PRD 给出的候选契约调用，不做 ownerId 过滤、也不用共享图库列表冒充结果。
+// 后端按当前登录用户过滤本人图片，前端只传分页、状态和现有图片筛选条件。
 export function listMyImages(query: ImageQuery): Promise<PageData<ImageVO>> {
   return get<PageData<ImageVO>>('/image/mine', query)
 }

@@ -11,7 +11,7 @@
   --cp-radius: 8px;
   --cp-radius-lg: 16px;
   --cp-radius-xl: 24px;
-  --cp-header-height: 56px;
+  --cp-header-height: 70px;
   --cp-container: 1280px;
   --cp-status-pending-fg: #d97706;
   --cp-status-pending-bg: #fef3c7;
@@ -94,39 +94,43 @@ a {
   margin-top: 32px;
 }
 
-/* 瀑布流：不同高宽比的卡片按列排布，避免统一裁切 */
+/* 固定列瀑布流：分页追加时不重新平衡已有卡片，避免滚动加载造成跳动 */
 .cp-masonry {
-  column-gap: 20px;
-  columns: 4;
+  --cp-masonry-columns: 4;
+  --cp-masonry-gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(var(--cp-masonry-columns), minmax(0, 1fr));
+  column-gap: var(--cp-masonry-gap);
 }
 
-.cp-masonry > * {
-  break-inside: avoid;
-  margin-bottom: 20px;
+.cp-masonry-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--cp-masonry-gap);
 }
 
 @media (max-width: 1199px) {
   .cp-masonry {
-    columns: 3;
+    --cp-masonry-columns: 3;
   }
 }
 
 @media (max-width: 899px) {
   .cp-masonry {
-    columns: 2;
+    --cp-masonry-columns: 2;
   }
 }
 
 @media (max-width: 575px) {
   .cp-masonry {
-    columns: 2;
-    column-gap: 12px;
+    --cp-masonry-gap: 12px;
   }
 }
 
 @media (max-width: 340px) {
   .cp-masonry {
-    columns: 1;
+    --cp-masonry-columns: 1;
   }
 }
 
@@ -217,10 +221,6 @@ a {
   }
 
   .cp-masonry {
-    column-gap: 12px;
-  }
-
-  .cp-masonry > * {
-    margin-bottom: 12px;
+    --cp-masonry-gap: 12px;
   }
 }

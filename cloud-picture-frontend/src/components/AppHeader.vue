@@ -31,11 +31,10 @@ watch(
 
 const navLinks = computed(() => {
   const links = [{ name: 'gallery', label: '共享图库' }]
+  links.push({ name: 'image-management', label: '图片管理' })
   if (isAdmin()) {
-    links.push({ name: 'admin-images', label: '图片审核' })
     links.push({ name: 'admin-users', label: '用户管理' })
   }
-  links.push({ name: 'my-images', label: '我的上传' })
   return links
 })
 
@@ -176,13 +175,9 @@ async function handleLogout() {
         <AppstoreOutlined />
         <span>共享图库</span>
       </RouterLink>
-      <RouterLink v-if="isAdmin()" :to="{ name: 'admin-images' }" class="mobile-tab">
+      <RouterLink :to="{ name: 'image-management' }" class="mobile-tab">
         <PictureOutlined />
-        <span>审核</span>
-      </RouterLink>
-      <RouterLink v-else :to="{ name: 'my-images' }" class="mobile-tab">
-        <PictureOutlined />
-        <span>我的上传</span>
+        <span>图片管理</span>
       </RouterLink>
       <button class="mobile-tab mobile-upload" type="button" @click="openUpload">
         <CloudUploadOutlined />

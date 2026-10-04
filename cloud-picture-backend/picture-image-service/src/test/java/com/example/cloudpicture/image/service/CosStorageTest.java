@@ -17,6 +17,26 @@ import org.mockito.ArgumentCaptor;
 class CosStorageTest {
 
     @Test
+    void signedMediumUrlUses1200PixelBound() throws Exception {
+        CosConfig cosConfig = mock(CosConfig.class);
+        COSClient cosClient = mock(COSClient.class);
+        when(cosConfig.getBucket()).thenReturn("demo-1250000000");
+        when(cosConfig.getSecretId()).thenReturn("AKIDfake");
+        when(cosConfig.getSecretKey()).thenReturn("fakekey");
+        when(cosConfig.cosClient()).thenReturn(cosClient);
+        when(cosClient.generatePresignedUrl(any(GeneratePresignedUrlRequest.class)))
+                .thenReturn(new URL("https://demo-1250000000.cos.ap-shanghai.myqcloud.com/picture/x.png?sig=1"));
+
+        CosStorage cosStorage = new CosStorage(cosConfig, 3600);
+        cosStorage.signedMediumUrl("picture/x.png");
+
+        ArgumentCaptor<GeneratePresignedUrlRequest> captor =
+                ArgumentCaptor.forClass(GeneratePresignedUrlRequest.class);
+        verify(cosClient).generatePresignedUrl(captor.capture());
+        assertEquals("thumbnail/1200x1200>", captor.getValue().getRequestParameters().get("imageMogr2"));
+    }
+
+    @Test
     void signedDownloadUrlSetsAttachmentResponseHeaders() throws Exception {
         CosConfig cosConfig = mock(CosConfig.class);
         COSClient cosClient = mock(COSClient.class);

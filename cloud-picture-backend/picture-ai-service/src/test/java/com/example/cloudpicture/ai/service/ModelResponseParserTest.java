@@ -53,6 +53,12 @@ class ModelResponseParserTest {
     }
 
     @Test
+    void rejectsTrailingContentAfterJson() {
+        assertUnavailable("{\"introduction\":\"x\",\"tags\":[]} trailing");
+        assertUnavailable("{\"introduction\":\"x\",\"tags\":[]}{\"extra\":1}");
+    }
+
+    @Test
     void cleansTagsTrimDedupeAndDropBlank() {
         ImageMetadataVO vo = ModelResponseParser.parse(
                 "{\"introduction\":\"x\",\"tags\":[\" 猫 \",\"\",\"  \",\"猫\",\"狗\",\"a\"]}");
