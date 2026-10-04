@@ -1,0 +1,38 @@
+server:
+  port: ${AI_SERVICE_PORT:8083}
+
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:prod}
+  # 本地开发读取项目根目录的 .env（IDEA 与命令行都不必再配环境变量）；正式环境用真实环境变量，优先级高于该文件
+  config:
+    import: "optional:file:./.env[.properties],optional:file:../.env[.properties]"
+  application:
+    name: picture-ai-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+  servlet:
+    multipart:
+      max-file-size: ${AI_MAX_FILE_SIZE:10MB}
+      max-request-size: ${AI_MAX_REQUEST_SIZE:12MB}
+
+picture:
+  # 新接口不加入公开白名单，任何请求都要求有效 Bearer Token
+  session:
+    ttl-seconds: ${SESSION_TTL_SECONDS:604800}
+  # 阿里云百炼 qwen3-vl-flash（北京地域兼容模式）；Key 只从环境变量读取，不落库、不打印
+  ai:
+    api-key: ${DASHSCOPE_API_KEY:}
+    base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    model: qwen3-vl-flash
+    timeout-seconds: 60
+    max-file-size: ${AI_MAX_FILE_SIZE:10MB}
+    rate-limit-per-minute: 10

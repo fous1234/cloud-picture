@@ -12,7 +12,11 @@ import { uploadOpen } from '../stores/ui'
   <div class="layout">
     <AppHeader />
     <main class="layout-main">
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <KeepAlive include="GalleryView">
+          <component :is="Component" />
+        </KeepAlive>
+      </RouterView>
     </main>
     <UploadModal v-model:open="uploadOpen" />
     <ImageEditModal />

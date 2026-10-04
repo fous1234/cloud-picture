@@ -44,3 +44,9 @@ spring:
             - Path=/api/image/**
           filters:
             - StripPrefix=1
+        - id: picture-ai-service-ai
+          uri: lb://picture-ai-service
+          predicates:
+            - Path=/api/ai/**
+          filters:
+            - StripPrefix=1

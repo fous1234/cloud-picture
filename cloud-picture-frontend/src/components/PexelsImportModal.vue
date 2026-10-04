@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Alert,
   Button,
@@ -18,6 +19,7 @@ import { bumpData, pexelsImportOpen } from '../stores/ui'
 import { normalizeTags, tagsTooLong } from '../utils/tags'
 
 const submitting = ref(false)
+const router = useRouter()
 const errorText = ref('')
 const warning = ref(false)
 const result = ref<ImportResult | null>(null)
@@ -49,6 +51,11 @@ watch(pexelsImportOpen, (open) => {
 function close() {
   pexelsImportOpen.value = false
   if (!submitting.value) reset()
+}
+
+function returnToImageManagement() {
+  close()
+  router.push({ name: 'image-management', query: { tab: 'mine' } })
 }
 
 function importSummary(value: ImportResult) {
@@ -207,7 +214,7 @@ async function submit() {
 
     <template #footer>
       <template v-if="result">
-        <Button type="primary" @click="close">返回我的上传</Button>
+        <Button type="primary" @click="returnToImageManagement">返回图片管理</Button>
       </template>
       <template v-else>
         <Button :disabled="submitting" @click="close">取消</Button>

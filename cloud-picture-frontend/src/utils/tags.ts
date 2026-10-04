@@ -1,13 +1,23 @@
 /** t_image.tags 是逗号分隔的 varchar(512)，前端按同一上限做预检 */
 export const TAGS_MAX_LENGTH = 512
 
+/** 标签在界面上带 # 展示，但提交到后端时保存普通文本。 */
+function stripDisplayPrefix(value: string): string {
+  return value.replace(/^#+/, '')
+}
+
 export function normalizeTags(tags: string[]): string[] {
   const result: string[] = []
   for (const raw of tags) {
-    const tag = (raw ?? '').replace(/[,，]/g, '').trim()
+    const tag = stripDisplayPrefix((raw ?? '').replace(/[,，]/g, '').trim())
     if (tag && !result.includes(tag)) result.push(tag)
   }
   return result
+}
+
+export function displayTag(tag: string): string {
+  const normalized = normalizeTags([tag])[0]
+  return normalized ? '#' + normalized : ''
 }
 
 export function tagsTooLong(tags: string[]): boolean {
@@ -26,7 +36,7 @@ export function validateImageFile(file: File): string | null {
     return '仅支持 JPEG、PNG 或 WebP 格式'
   }
   if (file.size > MAX_UPLOAD_BYTES) {
-    return `图片不能超过 ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`
+    return '图片不能超过 ' + MAX_UPLOAD_BYTES / 1024 / 1024 + ' MB'
   }
   return null
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { RouteLocationRaw } from 'vue-router'
 import {
   Alert,
   Button,
@@ -21,9 +22,15 @@ import { errorMessage } from '../api/http'
 import type { SharedImageVO } from '../api/types'
 import { isLoggedIn } from '../stores/session'
 import { formatDimensions, formatSize } from '../utils/format'
+import AppBreadcrumb from '../components/AppBreadcrumb.vue'
 
 const route = useRoute()
 const router = useRouter()
+
+const sharedCrumbs: { label: string; to?: RouteLocationRaw }[] = [
+  { label: '共享图库', to: { name: 'gallery' } },
+  { label: '分享图片' },
+]
 
 const image = ref<SharedImageVO | null>(null)
 const loading = ref(true)
@@ -159,7 +166,7 @@ watch(token, () => {
             <template #icon><ArrowLeftOutlined /></template>
             返回图库
           </Button>
-          <div class="shared-breadcrumb">共享图库 <span>/</span> 分享图片</div>
+          <AppBreadcrumb :items="sharedCrumbs" />
         </div>
         <Button
           v-if="isLoggedIn()"
@@ -292,19 +299,6 @@ watch(token, () => {
   flex: 0 0 auto;
   color: var(--cp-text-soft);
   font-size: 12px;
-}
-
-.shared-breadcrumb {
-  overflow: hidden;
-  color: var(--cp-text-muted);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shared-breadcrumb span {
-  padding: 0 6px;
-  color: var(--cp-border);
 }
 
 .shared-download-button {

@@ -1,37 +1,30 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { RouteLocationRaw } from 'vue-router'
 import {
   Alert,
   Avatar,
   Button,
   Descriptions,
   DescriptionsItem,
-  Input,
   Modal,
   Result,
   Skeleton,
-  Spin,
   Tag,
-  message,
 } from 'ant-design-vue'
 import {
   ArrowLeftOutlined,
   CloudDownloadOutlined,
-  CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
   ExclamationCircleOutlined,
-  LinkOutlined,
-  QrcodeOutlined,
-  ReloadOutlined,
   SafetyCertificateOutlined,
   ShareAltOutlined,
 } from '@ant-design/icons-vue'
-import QRCode from 'qrcode'
 import type { ImageVO } from '../api/types'
-import { createImageShare, downloadImage, getImage, getImageShare, revokeImageShare } from '../api/image'
+import { downloadImage, getImage } from '../api/image'
 import { errorMessage } from '../api/http'
 import { isAdmin, session } from '../stores/session'
 import {
@@ -44,6 +37,8 @@ import {
 } from '../stores/ui'
 import { confirmDeleteImage, isOwner } from '../utils/imageActions'
 import { formatDateTime, formatDimensions, formatSize } from '../utils/format'
+import ImageSharePanel from '../components/ImageSharePanel.vue'
+import AppBreadcrumb from '../components/AppBreadcrumb.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,21 +52,33 @@ const downloadLoading = ref(false)
 const downloadStarted = ref(false)
 const downloadError = ref<string | null>(null)
 const shareModalOpen = ref(false)
-const shareLoading = ref(false)
-const shareCreating = ref(false)
-const shareRegenerating = ref(false)
-const shareRevoking = ref(false)
-const shareToken = ref<string | null>(null)
-const shareQrCode = ref<string | null>(null)
-const shareError = ref<string | null>(null)
-const shareQrError = ref<string | null>(null)
 /** 签名地址失效只自动重取一次，再失败就交给用户手动重试 */
 let refreshedOnce = false
 let downloadRequestSequence = 0
-let shareRequestSequence = 0
-let shareQrRequestSequence = 0
 
 const id = computed(() => String(route.params.id))
+
+/** 来源是图片管理时面包屑走「图片管理 / 我的上传」，否则走「共享图库 / 分类」 */
+const originFromManagement = computed(() => {
+  const back = (window.history.state?.back as string | undefined) ?? ''
+  return back.startsWith('/image-management')
+})
+
+const crumbs = computed<{ label: string; to?: RouteLocationRaw }[]>(() => {
+  const trail: { label: string; to?: RouteLocationRaw }[] = []
+  if (originFromManagement.value) {
+    trail.push({ label: '图片管理', to: { name: 'image-management' } })
+    trail.push({ label: '我的上传', to: { name: 'image-management', query: { tab: 'mine' } } })
+  } else {
+    trail.push({ label: '共享图库', to: { name: 'gallery' } })
+    const category = image.value?.category
+    if (category) {
+      trail.push({ label: category, to: { name: 'gallery', query: { category } } })
+    }
+  }
+  trail.push({ label: '详情' })
+  return trail
+})
 
 const owner = computed(() => {
   const current = image.value
@@ -84,14 +91,6 @@ const canEdit = computed(() => !!image.value && isOwner(image.value))
 const canReview = computed(() => !!image.value && isAdmin() && image.value.reviewStatus !== 1)
 const canDelete = computed(() => !!image.value && (isOwner(image.value) || isAdmin()))
 const canShare = computed(() => !!image.value && image.value.reviewStatus === 1 && isOwner(image.value))
-const shareBusy = computed(
-  () => shareLoading.value || shareCreating.value || shareRegenerating.value || shareRevoking.value,
-)
-const shareUrl = computed(() =>
-  shareToken.value
-    ? `${window.location.origin}/share/${encodeURIComponent(shareToken.value)}`
-    : '',
-)
 
 function resetDownloadState() {
   downloadRequestSequence++
@@ -151,151 +150,13 @@ async function onDownload() {
   }
 }
 
-function resetShareState() {
-  shareRequestSequence++
-  shareQrRequestSequence++
-  shareLoading.value = false
-  shareCreating.value = false
-  shareRegenerating.value = false
-  shareRevoking.value = false
-  shareToken.value = null
-  shareQrCode.value = null
-  shareError.value = null
-  shareQrError.value = null
-}
-
 function closeShareModal() {
   shareModalOpen.value = false
-  resetShareState()
-}
-
-async function updateShareQr(token: string) {
-  const requestSequence = ++shareQrRequestSequence
-  shareQrCode.value = null
-  shareQrError.value = null
-  try {
-    const qrCode = await QRCode.toDataURL(`${window.location.origin}/share/${encodeURIComponent(token)}`, {
-      width: 144,
-      margin: 1,
-      errorCorrectionLevel: 'M',
-    })
-    if (requestSequence === shareQrRequestSequence && shareToken.value === token) {
-      shareQrCode.value = qrCode
-    }
-  } catch {
-    if (requestSequence === shareQrRequestSequence && shareToken.value === token) {
-      shareQrError.value = '二维码暂不可用，你仍可以复制分享链接。'
-    }
-  }
-}
-
-async function loadShareState() {
-  const currentImage = image.value
-  if (!currentImage || !canShare.value) return
-
-  const requestSequence = ++shareRequestSequence
-  shareLoading.value = true
-  shareError.value = null
-  try {
-    const share = await getImageShare(currentImage.id)
-    if (requestSequence !== shareRequestSequence || id.value !== currentImage.id) return
-    shareToken.value = share.enabled ? share.token : null
-    if (shareToken.value) await updateShareQr(shareToken.value)
-  } catch (e) {
-    if (requestSequence === shareRequestSequence && id.value === currentImage.id) {
-      shareError.value = errorMessage(e)
-    }
-  } finally {
-    if (requestSequence === shareRequestSequence) shareLoading.value = false
-  }
 }
 
 function openShareModal() {
-  if (!canShare.value || shareBusy.value) return
+  if (!canShare.value) return
   shareModalOpen.value = true
-  void loadShareState()
-}
-
-async function onCreateShare(regenerating = false) {
-  const currentImage = image.value
-  if (!currentImage || !canShare.value || shareBusy.value) return
-
-  const requestSequence = shareRequestSequence
-  if (regenerating) shareRegenerating.value = true
-  else shareCreating.value = true
-  shareError.value = null
-  try {
-    const share = await createImageShare(currentImage.id)
-    if (requestSequence !== shareRequestSequence || id.value !== currentImage.id) return
-    shareToken.value = share.enabled ? share.token : null
-    if (!shareToken.value) throw new Error('分享链接生成失败，请重试')
-    await updateShareQr(shareToken.value)
-    message.success(regenerating ? '分享链接已重新生成' : '分享链接已生成')
-  } catch (e) {
-    if (requestSequence === shareRequestSequence && id.value === currentImage.id) {
-      shareError.value = errorMessage(e)
-    }
-  } finally {
-    if (requestSequence === shareRequestSequence) {
-      shareCreating.value = false
-      shareRegenerating.value = false
-    }
-  }
-}
-
-function confirmRegenerateShare() {
-  Modal.confirm({
-    title: '重新生成分享链接？',
-    content: '重新生成后，之前的分享链接将立即失效。',
-    okText: '重新生成',
-    cancelText: '取消',
-    onOk: () => onCreateShare(true),
-  })
-}
-
-async function onRevokeShare() {
-  const currentImage = image.value
-  if (!currentImage || !shareToken.value || shareBusy.value) return
-
-  const requestSequence = shareRequestSequence
-  shareRevoking.value = true
-  shareError.value = null
-  try {
-    const revoked = await revokeImageShare(currentImage.id)
-    if (requestSequence !== shareRequestSequence || id.value !== currentImage.id) return
-    if (!revoked) throw new Error('分享链接未能撤销，请重试')
-    shareToken.value = null
-    shareQrCode.value = null
-    shareQrError.value = null
-    message.success('分享链接已撤销')
-  } catch (e) {
-    if (requestSequence === shareRequestSequence && id.value === currentImage.id) {
-      shareError.value = errorMessage(e)
-    }
-  } finally {
-    if (requestSequence === shareRequestSequence) shareRevoking.value = false
-  }
-}
-
-function confirmRevokeShare() {
-  Modal.confirm({
-    title: '撤销分享链接？',
-    content: '撤销后，已发出的链接将无法继续访问。',
-    okText: '撤销分享',
-    cancelText: '取消',
-    okButtonProps: { danger: true },
-    onOk: onRevokeShare,
-  })
-}
-
-async function copyShareLink() {
-  if (!shareUrl.value) return
-  try {
-    await navigator.clipboard.writeText(shareUrl.value)
-    message.success('链接已复制，可以粘贴到微信分享')
-  } catch {
-    message.warning('复制失败，请手动选择并复制分享链接')
-  }
 }
 
 async function onImageError() {
@@ -307,9 +168,15 @@ async function onImageError() {
   await load()
 }
 
+/** 返回上一跳；新标签页直接打开等没有历史时回退到图库 */
+function goBack() {
+  if (window.history.state?.back) router.back()
+  else router.push({ name: 'gallery' })
+}
+
 function onDelete() {
   if (!image.value) return
-  confirmDeleteImage(image.value, () => router.push({ name: 'gallery' }))
+  confirmDeleteImage(image.value, () => goBack())
 }
 
 watch(id, () => {
@@ -327,13 +194,11 @@ watch(canShare, (allowed) => {
   <div class="cp-container cp-page">
     <div class="detail-toolbar">
       <div class="detail-toolbar-leading">
-        <Button class="back-link" type="link" @click="router.push({ name: 'gallery' })">
+        <Button class="back-link" type="link" @click="goBack">
           <template #icon><ArrowLeftOutlined /></template>
-          返回图库
+          返回
         </Button>
-        <div v-if="image" class="detail-breadcrumb">
-          共享图库 <span>/</span> {{ image.category || '图片' }} <span>/</span> 详情
-        </div>
+        <AppBreadcrumb v-if="image" :items="crumbs" />
       </div>
       <div v-if="image && !loading" class="detail-toolbar-actions">
         <Button v-if="canShare" class="share-button" @click="openShareModal">
@@ -359,80 +224,12 @@ watch(canShare, (allowed) => {
       title="分享图片"
       :width="560"
       :footer="null"
-      :mask-closable="!shareBusy"
       wrap-class-name="share-modal-wrap"
       @cancel="closeShareModal"
     >
       <div class="share-modal-content">
         <p class="share-modal-description">复制链接或使用微信扫码，分享这张图片。</p>
-
-        <div v-if="shareLoading" class="share-modal-loading">
-          <Spin />
-          <span>正在获取分享链接</span>
-        </div>
-
-        <template v-else>
-          <Alert v-if="shareError" type="error" show-icon :message="shareError" />
-
-          <template v-if="shareToken">
-            <div class="share-link-row">
-              <Input :value="shareUrl" readonly aria-label="分享链接" />
-              <Button class="share-copy-button" type="primary" :disabled="shareBusy" @click="copyShareLink">
-                <template #icon><CopyOutlined /></template>
-                复制链接
-              </Button>
-            </div>
-
-            <div class="share-qr-card">
-              <div class="share-qr-frame">
-                <img v-if="shareQrCode" :src="shareQrCode" alt="图片分享链接二维码" />
-                <Spin v-else-if="!shareQrError" />
-                <QrcodeOutlined v-else class="share-qr-fallback" />
-              </div>
-              <div class="share-qr-copy">
-                <span class="share-qr-label">微信扫码即可查看</span>
-                <strong>分享图片给更多人</strong>
-                <p>访客无需登录即可预览，下载原图仍需登录。</p>
-              </div>
-            </div>
-
-            <Alert
-              v-if="shareQrError"
-              class="share-qr-warning"
-              type="warning"
-              show-icon
-              :message="shareQrError"
-            />
-
-            <div class="share-modal-notice">
-              <LinkOutlined />
-              <span>链接长期有效；撤销或重新生成后，旧链接将失效。</span>
-            </div>
-
-            <div class="share-modal-actions">
-              <Button :disabled="shareBusy" :loading="shareRegenerating" @click="confirmRegenerateShare">
-                <template #icon><ReloadOutlined /></template>
-                重新生成
-              </Button>
-              <Button danger :disabled="shareBusy" :loading="shareRevoking" @click="confirmRevokeShare">
-                <template #icon><DeleteOutlined /></template>
-                撤销分享
-              </Button>
-            </div>
-          </template>
-
-          <div v-else-if="!shareError" class="share-empty-state">
-            <p>为这张已审核通过的图片创建一个可转发的分享链接。</p>
-            <Button type="primary" :loading="shareCreating" :disabled="shareBusy" @click="onCreateShare()">
-              <template #icon><LinkOutlined /></template>
-              生成分享链接
-            </Button>
-          </div>
-
-          <Button v-if="shareError" class="share-retry-button" :loading="shareLoading" @click="loadShareState">
-            重试
-          </Button>
-        </template>
+        <ImageSharePanel v-if="shareModalOpen" :image-id="id" />
       </div>
     </Modal>
 
@@ -472,7 +269,7 @@ watch(canShare, (allowed) => {
       sub-title="图片可能已被删除，或尚未通过审核。"
     >
       <template #extra>
-        <Button type="primary" @click="router.push({ name: 'gallery' })">返回图库</Button>
+        <Button type="primary" @click="goBack">返回</Button>
       </template>
     </Result>
 
@@ -632,20 +429,6 @@ watch(canShare, (allowed) => {
   font-size: 12px;
 }
 
-.detail-breadcrumb {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--cp-text-muted);
-  font-size: 11px;
-}
-
-.detail-breadcrumb span {
-  padding: 0 6px;
-  color: var(--cp-border);
-}
-
 .download-button {
   flex: 0 0 auto;
   border-radius: var(--cp-radius);
@@ -665,124 +448,6 @@ watch(canShare, (allowed) => {
   margin: 0;
   color: var(--cp-text-soft);
   font-size: 13px;
-}
-
-.share-modal-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 100px;
-  color: var(--cp-text-soft);
-}
-
-.share-link-row {
-  display: flex;
-  gap: 8px;
-}
-
-.share-copy-button {
-  flex: 0 0 auto;
-  border-radius: var(--cp-radius);
-}
-
-.share-qr-card {
-  display: grid;
-  grid-template-columns: 144px minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--cp-border-subtle);
-  border-radius: var(--cp-radius-lg);
-  background: var(--cp-surface);
-}
-
-.share-qr-frame {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 144px;
-  height: 144px;
-  border-radius: var(--cp-radius);
-  background: #fff;
-}
-
-.share-qr-frame img {
-  display: block;
-  width: 144px;
-  height: 144px;
-}
-
-.share-qr-fallback {
-  color: var(--cp-text-muted);
-  font-size: 28px;
-}
-
-.share-qr-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.share-qr-label {
-  color: var(--cp-status-approved-fg);
-  font-size: 12px;
-}
-
-.share-qr-copy strong {
-  color: var(--cp-text);
-  font-size: 15px;
-}
-
-.share-qr-copy p {
-  margin: 0;
-  color: var(--cp-text-soft);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.share-qr-warning {
-  margin-top: -8px;
-}
-
-.share-modal-notice {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--cp-border-subtle);
-  border-radius: var(--cp-radius);
-  background: var(--cp-surface);
-  color: var(--cp-text-soft);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.share-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.share-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--cp-border-subtle);
-  border-radius: var(--cp-radius-lg);
-  background: var(--cp-surface);
-}
-
-.share-empty-state p {
-  margin: 0;
-  color: var(--cp-text-soft);
-  font-size: 13px;
-}
-
-.share-retry-button {
-  align-self: flex-start;
 }
 
 .download-available {
@@ -1015,24 +680,6 @@ watch(canShare, (allowed) => {
   :global(.share-modal-wrap .ant-modal) {
     max-width: calc(100vw - 24px);
     margin: 12px auto;
-  }
-
-  .share-link-row {
-    flex-direction: column;
-  }
-
-  .share-copy-button {
-    width: 100%;
-  }
-
-  .share-qr-card {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
-  }
-
-  .share-modal-actions {
-    flex-wrap: wrap;
   }
 
   .download-status {

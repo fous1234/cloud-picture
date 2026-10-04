@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteLocation } from 'vue-router'
 import { getCurrentUser } from '../api/user'
 import { setUnauthorizedHandler } from '../api/http'
 import { clearSession, isAdmin, isLoggedIn, session, setUser } from '../stores/session'
@@ -50,9 +51,18 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'image-management',
+        name: 'image-management',
+        component: () => import('../views/ImageManagementView.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'my-images',
         name: 'my-images',
-        component: () => import('../views/MyImagesView.vue'),
+        redirect: (to: RouteLocation) => ({
+          name: 'image-management',
+          query: { ...to.query, tab: 'mine' },
+        }),
         meta: { requiresAuth: true },
       },
       {
@@ -64,7 +74,10 @@ const routes = [
       {
         path: 'admin/images',
         name: 'admin-images',
-        component: () => import('../views/AdminImagesView.vue'),
+        redirect: (to: RouteLocation) => ({
+          name: 'image-management',
+          query: { ...to.query, tab: 'review' },
+        }),
         meta: { requiresAuth: true, requiresAdmin: true },
       },
       {

@@ -126,6 +126,30 @@ class ImageServiceTest {
     }
 
     @Test
+    void sharedGalleryPageIncludesSignedMediumUrl() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Image.class);
+        ImageMapper imageMapper = mock(ImageMapper.class);
+        ImageTagMapper imageTagMapper = mock(ImageTagMapper.class);
+        CosStorage cosStorage = mock(CosStorage.class);
+        Image galleryImage = image(10L, 42L, Image.REVIEW_PASSED);
+        Page<Image> page = new Page<>(1, 12);
+        page.setRecords(List.of(galleryImage));
+        when(imageMapper.selectPage(any(Page.class), any(Wrapper.class))).thenReturn(page);
+        when(cosStorage.signedMediumUrl("picture/10.png")).thenReturn("https://signed-medium");
+
+        ImageService service = new ImageServiceImpl(imageMapper, imageTagMapper, cosStorage,
+                mock(UploaderFiller.class), "10MB");
+        ImageQueryRequest request = new ImageQueryRequest();
+        request.setCurrent(1);
+        request.setSize(12);
+
+        var result = service.pageImages(request);
+
+        assertEquals("https://signed-medium", result.getRecords().get(0).getMediumUrl());
+        verify(cosStorage).signedMediumUrl("picture/10.png");
+    }
+
+    @Test
     void passedImageDownloadableByAnyLoggedInUser() {
         ImageMapper imageMapper = mock(ImageMapper.class);
         when(imageMapper.selectById(10L)).thenReturn(image(10L, 42L, Image.REVIEW_PASSED));

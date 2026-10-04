@@ -1,0 +1,4 @@
+# 生产环境差异配置；Nacos、Redis 与模型密钥仍由环境变量提供
+logging:
+  level:
+    com.example.cloudpicture: info
