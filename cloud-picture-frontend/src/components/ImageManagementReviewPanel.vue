@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { Button, Input, Pagination, RadioButton, RadioGroup, Skeleton } from 'ant-design-vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { Button, message } from 'ant-design-vue'
+import { ReloadOutlined, SearchOutlined, TagsOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { ImageVO, ReviewStatus } from '../api/types'
-import { listAdminImages } from '../api/admin-image'
+import type { Id, ImageVO, ReviewStatus } from '../api/types'
+import { listAdminImages, reviewImage } from '../api/admin-image'
 import { errorMessage } from '../api/http'
-import { dataVersion } from '../stores/ui'
+import { bumpData, dataVersion, openEdit } from '../stores/ui'
 import { confirmDeleteImage } from '../utils/imageActions'
-import ErrorState from './ErrorState.vue'
-import EmptyState from './EmptyState.vue'
-import ManagementImageCard from './ManagementImageCard.vue'
+import ManagementStatusBar from './ManagementStatusBar.vue'
+import ImageManagementQueue from './ImageManagementQueue.vue'
+import ImageManagementDetail from './ImageManagementDetail.vue'
 
 const props = defineProps<{
   stats: {
@@ -18,14 +19,6 @@ const props = defineProps<{
     rejected: number | null
     mine: number | null
   }
-  batchMode: boolean
-  selectedIds: Set<string>
-}>()
-
-const emit = defineEmits<{
-  toggleBatch: []
-  toggleSelect: [ImageVO]
-  clearSelection: []
 }>()
 
 const DEFAULT_PAGE_SIZE = 12
@@ -33,15 +26,25 @@ const images = ref<ImageVO[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const selectedId = ref<Id | null>(null)
+const reviewing = ref(false)
 const nameInput = ref('')
 const tagInput = ref('')
+const detailHost = ref<HTMLElement | null>(null)
 let requestSeq = 0
 
 const STATUS_OPTIONS = [
-  { value: '0', label: '全部待审', key: 'pending' as const },
+  { value: '0', label: '待审核', key: 'pending' as const },
   { value: '1', label: '已通过', key: 'approved' as const },
   { value: '2', label: '已拒绝', key: 'rejected' as const },
 ]
+
+const route = useRoute()
+const router = useRouter()
+
+function routeQuery(key: string) {
+  return route.query[key]
+}
 
 function readQuery() {
   const value = (input: unknown) => (typeof input === 'string' && input ? input : undefined)
@@ -58,18 +61,22 @@ function readQuery() {
   }
 }
 
-const route = useRoute()
-const router = useRouter()
-
-function routeQuery(key: string) {
-  return route.query[key]
-}
-
 const query = computed(() => readQuery())
 const status = computed({
   get: () => query.value.status,
   set: (value: string) => pushQuery({ status: value, current: 1 }),
 })
+const selectedImage = computed(() => images.value.find((item) => item.id === selectedId.value) ?? null)
+const queueLabel = computed(() =>
+  query.value.status === '0' ? `${total.value} 张待决` : `${total.value} 张`,
+)
+const statusOptions = computed(() =>
+  STATUS_OPTIONS.map((option) => ({
+    value: option.value,
+    label: option.label,
+    count: countFor(option.key),
+  })),
+)
 
 function countFor(key: 'pending' | 'approved' | 'rejected') {
   const value = props.stats[key]
@@ -92,10 +99,14 @@ async function load() {
     if (seq !== requestSeq) return
     images.value = page.records ?? []
     total.value = page.total ?? 0
+    if (!images.value.some((item) => item.id === selectedId.value)) {
+      selectedId.value = images.value[0]?.id ?? null
+    }
   } catch (e) {
     if (seq !== requestSeq) return
     images.value = []
     total.value = 0
+    selectedId.value = null
     error.value = errorMessage(e)
   } finally {
     if (seq === requestSeq) loading.value = false
@@ -121,8 +132,59 @@ function submitSearch() {
   })
 }
 
+function resetSearch() {
+  nameInput.value = ''
+  tagInput.value = ''
+  pushQuery({ name: undefined, tag: undefined, current: 1 })
+}
+
 function changePage(page: number, size: number) {
   pushQuery({ current: page, size })
+}
+
+function selectImage(id: Id) {
+  selectedId.value = id
+  if (window.innerWidth < 1024) {
+    nextTick(() => detailHost.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+}
+
+/** 审核后自动选中下一项（无下一项则退回上一项） */
+function advanceSelection(afterId: Id) {
+  const list = images.value
+  const index = list.findIndex((item) => item.id === afterId)
+  const next = index >= 0 ? list[index + 1] ?? list[index - 1] : list[0]
+  selectedId.value = next ? next.id : null
+}
+
+async function onApprove(image: ImageVO) {
+  if (reviewing.value) return
+  reviewing.value = true
+  try {
+    await reviewImage({ id: image.id, reviewStatus: 1 })
+    message.success('已通过并公开')
+    advanceSelection(image.id)
+    bumpData()
+  } catch (e) {
+    message.error(errorMessage(e))
+  } finally {
+    reviewing.value = false
+  }
+}
+
+async function onReject(image: ImageVO, reason: string) {
+  if (reviewing.value) return
+  reviewing.value = true
+  try {
+    await reviewImage({ id: image.id, reviewStatus: 2, reviewMessage: reason })
+    message.success('已拒绝并通知创作者')
+    advanceSelection(image.id)
+    bumpData()
+  } catch (e) {
+    message.error(errorMessage(e))
+  } finally {
+    reviewing.value = false
+  }
 }
 
 watch(
@@ -139,63 +201,53 @@ watch(dataVersion, load)
 
 <template>
   <section class="management-panel">
-    <div class="management-toolbar">
-      <RadioGroup v-model:value="status" button-style="solid">
-        <RadioButton v-for="option in STATUS_OPTIONS" :key="option.value" :value="option.value">
-          {{ option.label }}
-          <span class="status-count">{{ countFor(option.key) }}</span>
-        </RadioButton>
-      </RadioGroup>
-      <div class="management-search">
-        <Input
-          v-model:value="nameInput"
-          allow-clear
-          placeholder="搜索图片标题"
-          @press-enter="submitSearch"
+    <div class="management-filter">
+      <ManagementStatusBar v-model="status" :options="statusOptions" />
+      <form class="management-search" @submit.prevent="submitSearch">
+        <div class="management-search-field">
+          <SearchOutlined />
+          <input v-model="nameInput" type="text" placeholder="按标题检索..." />
+        </div>
+        <div class="management-search-field">
+          <TagsOutlined />
+          <input v-model="tagInput" type="text" placeholder="按标签检索..." />
+        </div>
+        <Button type="primary" class="management-search-submit" @click="submitSearch">搜索</Button>
+        <button type="button" class="management-search-reset" title="清空检索" @click="resetSearch">
+          <ReloadOutlined />
+        </button>
+      </form>
+    </div>
+
+    <div class="management-workbench">
+      <ImageManagementQueue
+        :images="images"
+        mode="review"
+        :selected-id="selectedId"
+        :loading="loading"
+        :error="error"
+        :total="total"
+        :current="query.current"
+        :size="query.size"
+        :count-label="queueLabel"
+        empty-description="当前没有符合条件的图片"
+        show-tips
+        @select="selectImage"
+        @retry="load"
+        @page="changePage"
+      />
+      <div ref="detailHost" class="management-detail-column">
+        <ImageManagementDetail
+          :image="selectedImage"
+          mode="review"
+          :reviewing="reviewing"
+          @approve="onApprove"
+          @reject="onReject"
+          @edit="openEdit"
+          @delete="(image) => confirmDeleteImage(image, load)"
         />
-        <Input
-          v-model:value="tagInput"
-          allow-clear
-          placeholder="搜索标签"
-          @press-enter="submitSearch"
-        />
-        <Button type="primary" @click="submitSearch">搜索</Button>
       </div>
     </div>
-
-    <div v-if="batchMode" class="batch-selection-bar">
-      <span>已选择 {{ selectedIds.size }} 张图片</span>
-      <span class="batch-selection-note">批量操作接口尚未接入</span>
-      <Button size="small" @click="emit('clearSelection')">清空选择</Button>
-    </div>
-
-    <Skeleton v-if="loading && !images.length" :paragraph="{ rows: 7 }" active />
-    <ErrorState v-else-if="error" message="审核列表加载失败" :description="error" @retry="load" />
-    <EmptyState v-else-if="!images.length" description="当前没有符合条件的图片" />
-
-    <div v-else class="management-grid" :class="{ 'management-grid-batch': batchMode }">
-      <ManagementImageCard
-        v-for="image in images"
-        :key="image.id"
-        mode="review"
-        :image="image"
-        :batch-mode="batchMode"
-        :selected="selectedIds.has(image.id)"
-        @toggle-select="emit('toggleSelect', $event)"
-        @delete="(item) => confirmDeleteImage(item, load)"
-      />
-    </div>
-
-    <div v-if="loading && images.length" class="list-refreshing">正在刷新列表…</div>
-    <Pagination
-      v-if="total > 0"
-      class="management-pagination"
-      :current="query.current"
-      :page-size="query.size"
-      :total="total"
-      show-less-items
-      @change="changePage"
-    />
   </section>
 </template>
 
@@ -206,96 +258,100 @@ watch(dataVersion, load)
   gap: 20px;
 }
 
-.management-toolbar {
+.management-filter {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px;
+  border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius-lg);
   background: var(--cp-surface);
-  box-shadow: 0 1px 4px rgba(17, 24, 39, 0.04);
-}
-
-.management-toolbar :deep(.ant-radio-button-wrapper) {
-  border: 0;
-  border-radius: 8px;
-}
-
-.status-count {
-  margin-left: 4px;
-  color: var(--cp-text-muted);
-  font-size: 11px;
-}
-
-.management-toolbar :deep(.ant-radio-button-wrapper-checked) .status-count {
-  color: inherit;
+  box-shadow: var(--cp-shadow-subtle);
 }
 
 .management-search {
   display: flex;
   flex: 1;
-  min-width: 280px;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  min-width: 260px;
 }
 
-.management-search :deep(.ant-input) {
-  width: 150px;
+.management-search-field {
+  position: relative;
+  flex: 1 1 170px;
+  max-width: 260px;
 }
 
-.batch-selection-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px dashed var(--cp-border);
+.management-search-field :deep(.anticon) {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--cp-text-muted);
+  font-size: 15px;
+  pointer-events: none;
+}
+
+.management-search-field input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 34px;
+  border: 1px solid transparent;
   border-radius: var(--cp-radius);
   background: var(--cp-bg-soft);
   color: var(--cp-text);
-  font-size: 13px;
-}
-
-.batch-selection-note {
-  color: var(--cp-text-soft);
+  font: inherit;
   font-size: 12px;
 }
 
-.batch-selection-bar :deep(.ant-btn) {
-  margin-left: auto;
+.management-search-field input::placeholder {
+  color: var(--cp-text-muted);
 }
 
-.management-grid {
-  column-count: 3;
-  column-gap: 24px;
+.management-search-field input:focus {
+  outline: none;
+  border-color: var(--cp-border);
+  background: var(--cp-surface);
+  box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.06);
 }
 
-.management-grid :deep(.management-card) {
-  break-inside: avoid;
-  margin-bottom: 24px;
+.management-search-submit {
+  height: 36px;
+  border-radius: var(--cp-radius);
 }
 
-.list-refreshing {
+.management-search-reset {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  background: var(--cp-surface);
   color: var(--cp-text-soft);
-  font-size: 12px;
-  text-align: center;
+  cursor: pointer;
 }
 
-.management-pagination {
-  align-self: center;
-  margin-top: 8px;
+.management-search-reset:hover {
+  background: var(--cp-bg-soft);
 }
 
-@media (max-width: 991px) {
-  .management-grid {
-    column-count: 2;
-  }
+.management-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 24px;
+  align-items: start;
 }
 
-@media (max-width: 767px) {
-  .management-toolbar {
-    align-items: stretch;
+@media (max-width: 1023px) {
+  .management-workbench {
+    grid-template-columns: 1fr;
   }
 
   .management-search {
@@ -303,28 +359,8 @@ watch(dataVersion, load)
     justify-content: stretch;
   }
 
-  .management-search :deep(.ant-input) {
-    flex: 1;
-    width: auto;
-  }
-}
-
-@media (max-width: 575px) {
-  .management-grid {
-    column-count: 1;
-    column-gap: 14px;
-  }
-
-  .management-grid :deep(.management-card) {
-    margin-bottom: 14px;
-  }
-
-  .batch-selection-bar {
-    flex-wrap: wrap;
-  }
-
-  .batch-selection-note {
-    width: 100%;
+  .management-search-field {
+    max-width: none;
   }
 }
 </style>

@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { Button, Input, Pagination, RadioButton, RadioGroup, Skeleton } from 'ant-design-vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { Button } from 'ant-design-vue'
+import { ReloadOutlined, SearchOutlined, TagsOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { ImageVO, ReviewStatus } from '../api/types'
+import type { Id, ImageVO } from '../api/types'
 import { listMyImages } from '../api/image'
 import { errorMessage } from '../api/http'
-import { dataVersion } from '../stores/ui'
+import { dataVersion, openEdit } from '../stores/ui'
 import { confirmDeleteImage } from '../utils/imageActions'
-import ErrorState from './ErrorState.vue'
-import EmptyState from './EmptyState.vue'
-import ManagementImageCard from './ManagementImageCard.vue'
+import ImageManagementQueue from './ImageManagementQueue.vue'
+import ImageManagementDetail from './ImageManagementDetail.vue'
 
-const props = defineProps<{
+defineProps<{
   stats: {
     total: number | null
     approved: number | null
@@ -27,45 +27,34 @@ const images = ref<ImageVO[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const selectedId = ref<Id | null>(null)
 const nameInput = ref('')
 const tagInput = ref('')
+const detailHost = ref<HTMLElement | null>(null)
 let requestSeq = 0
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: '全部作品', key: 'total' as const },
-  { value: '1', label: '审核通过 · 已入库', key: 'approved' as const },
-  { value: '0', label: '审核中 · 待处理', key: 'pending' as const },
-  { value: '2', label: '未通过审核', key: 'rejected' as const },
-]
 
 const route = useRoute()
 const router = useRouter()
 
+function routeQuery(key: string) {
+  return route.query[key]
+}
+
 function readQuery() {
   const value = (input: unknown) => (typeof input === 'string' && input ? input : undefined)
-  const current = Number(route.query.current) > 0 ? Number(route.query.current) : 1
-  const size = Number(route.query.size) > 0 ? Number(route.query.size) : DEFAULT_PAGE_SIZE
-  const statusValue = value(route.query.status)
-  const status = statusValue && ['0', '1', '2'].includes(statusValue) ? statusValue : 'all'
+  const current = Number(routeQuery('current')) > 0 ? Number(routeQuery('current')) : 1
+  const size = Number(routeQuery('size')) > 0 ? Number(routeQuery('size')) : DEFAULT_PAGE_SIZE
   return {
     current,
     size,
-    status,
-    name: value(route.query.name),
-    tag: value(route.query.tag),
+    name: value(routeQuery('name')),
+    tag: value(routeQuery('tag')),
   }
 }
 
 const query = computed(() => readQuery())
-const status = computed({
-  get: () => query.value.status,
-  set: (value: string) => pushQuery({ status: value === 'all' ? undefined : value, current: 1 }),
-})
-
-function countFor(key: 'total' | 'approved' | 'pending' | 'rejected') {
-  const value = props.stats[key]
-  return value === null ? '—' : value
-}
+const selectedImage = computed(() => images.value.find((item) => item.id === selectedId.value) ?? null)
+const queueLabel = computed(() => `${total.value} 张`)
 
 async function load() {
   const current = query.value
@@ -78,16 +67,18 @@ async function load() {
       size: current.size,
       name: current.name,
       tag: current.tag,
-      reviewStatus:
-        current.status === 'all' ? undefined : (Number(current.status) as ReviewStatus),
     })
     if (seq !== requestSeq) return
     images.value = page.records ?? []
     total.value = page.total ?? 0
+    if (!images.value.some((item) => item.id === selectedId.value)) {
+      selectedId.value = images.value[0]?.id ?? null
+    }
   } catch (e) {
     if (seq !== requestSeq) return
     images.value = []
     total.value = 0
+    selectedId.value = null
     error.value = errorMessage(e)
   } finally {
     if (seq === requestSeq) loading.value = false
@@ -97,7 +88,6 @@ async function load() {
 function pushQuery(patch: Record<string, string | number | undefined>) {
   const merged = { ...query.value, ...patch }
   const next: Record<string, string | number> = { tab: 'mine' }
-  if (merged.status && merged.status !== 'all') next.status = merged.status
   if (merged.name) next.name = merged.name
   if (merged.tag) next.tag = merged.tag
   if (merged.current > 1) next.current = merged.current
@@ -113,8 +103,21 @@ function submitSearch() {
   })
 }
 
+function resetSearch() {
+  nameInput.value = ''
+  tagInput.value = ''
+  pushQuery({ name: undefined, tag: undefined, current: 1 })
+}
+
 function changePage(page: number, size: number) {
   pushQuery({ current: page, size })
+}
+
+function selectImage(id: Id) {
+  selectedId.value = id
+  if (window.innerWidth < 1024) {
+    nextTick(() => detailHost.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
 }
 
 watch(
@@ -131,59 +134,50 @@ watch(dataVersion, load)
 
 <template>
   <section class="management-panel">
-    <div class="management-toolbar">
-      <RadioGroup v-model:value="status" button-style="solid">
-        <RadioButton v-for="option in STATUS_OPTIONS" :key="option.value" :value="option.value">
-          {{ option.label }}
-          <span class="status-count">{{ countFor(option.key) }}</span>
-        </RadioButton>
-      </RadioGroup>
-      <div class="management-search">
-        <Input
-          v-model:value="nameInput"
-          allow-clear
-          placeholder="搜索作品标题"
-          @press-enter="submitSearch"
+    <div class="management-filter">
+      <form class="management-search" @submit.prevent="submitSearch">
+        <div class="management-search-field">
+          <SearchOutlined />
+          <input v-model="nameInput" type="text" placeholder="按标题检索..." />
+        </div>
+        <div class="management-search-field">
+          <TagsOutlined />
+          <input v-model="tagInput" type="text" placeholder="按标签检索..." />
+        </div>
+        <Button type="primary" class="management-search-submit" @click="submitSearch">搜索</Button>
+        <button type="button" class="management-search-reset" title="清空检索" @click="resetSearch">
+          <ReloadOutlined />
+        </button>
+      </form>
+    </div>
+
+    <div class="management-workbench">
+      <ImageManagementQueue
+        :images="images"
+        mode="mine"
+        :selected-id="selectedId"
+        :loading="loading"
+        :error="error"
+        :total="total"
+        :current="query.current"
+        :size="query.size"
+        :count-label="queueLabel"
+        empty-description="还没有上传图片"
+        show-upload-action
+        @select="selectImage"
+        @retry="load"
+        @page="changePage"
+        @upload="emit('upload')"
+      />
+      <div ref="detailHost" class="management-detail-column">
+        <ImageManagementDetail
+          :image="selectedImage"
+          mode="mine"
+          @edit="openEdit"
+          @delete="(image) => confirmDeleteImage(image, load)"
         />
-        <Input
-          v-model:value="tagInput"
-          allow-clear
-          placeholder="搜索标签"
-          @press-enter="submitSearch"
-        />
-        <Button type="primary" @click="submitSearch">搜索</Button>
       </div>
     </div>
-
-    <Skeleton v-if="loading && !images.length" :paragraph="{ rows: 7 }" active />
-    <ErrorState v-else-if="error" message="我的上传加载失败" :description="error" @retry="load" />
-    <EmptyState
-      v-else-if="!images.length"
-      :description="query.status === 'all' ? '还没有上传图片' : '该状态下没有图片'"
-    >
-      <Button type="primary" @click="emit('upload')">上传图片</Button>
-    </EmptyState>
-
-    <div v-else class="management-grid">
-      <ManagementImageCard
-        v-for="image in images"
-        :key="image.id"
-        mode="mine"
-        :image="image"
-        @delete="(item) => confirmDeleteImage(item, load)"
-      />
-    </div>
-
-    <div v-if="loading && images.length" class="list-refreshing">正在刷新列表…</div>
-    <Pagination
-      v-if="total > 0"
-      class="management-pagination"
-      :current="query.current"
-      :page-size="query.size"
-      :total="total"
-      show-less-items
-      @change="changePage"
-    />
   </section>
 </template>
 
@@ -194,75 +188,100 @@ watch(dataVersion, load)
   gap: 20px;
 }
 
-.management-toolbar {
+.management-filter {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px;
+  border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius-lg);
   background: var(--cp-surface);
-  box-shadow: 0 1px 4px rgba(17, 24, 39, 0.04);
-}
-
-.management-toolbar :deep(.ant-radio-button-wrapper) {
-  border: 0;
-  border-radius: 8px;
-}
-
-.status-count {
-  margin-left: 4px;
-  color: var(--cp-text-muted);
-  font-size: 11px;
-}
-
-.management-toolbar :deep(.ant-radio-button-wrapper-checked) .status-count {
-  color: inherit;
+  box-shadow: var(--cp-shadow-subtle);
 }
 
 .management-search {
   display: flex;
   flex: 1;
-  min-width: 280px;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  min-width: 260px;
 }
 
-.management-search :deep(.ant-input) {
-  width: 150px;
+.management-search-field {
+  position: relative;
+  flex: 1 1 170px;
+  max-width: 260px;
 }
 
-.management-grid {
-  column-count: 3;
-  column-gap: 24px;
+.management-search-field :deep(.anticon) {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--cp-text-muted);
+  font-size: 15px;
+  pointer-events: none;
 }
 
-.management-grid :deep(.management-card) {
-  break-inside: avoid;
-  margin-bottom: 24px;
-}
-
-.list-refreshing {
-  color: var(--cp-text-soft);
+.management-search-field input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 34px;
+  border: 1px solid transparent;
+  border-radius: var(--cp-radius);
+  background: var(--cp-bg-soft);
+  color: var(--cp-text);
+  font: inherit;
   font-size: 12px;
-  text-align: center;
 }
 
-.management-pagination {
-  align-self: center;
-  margin-top: 8px;
+.management-search-field input::placeholder {
+  color: var(--cp-text-muted);
 }
 
-@media (max-width: 991px) {
-  .management-grid {
-    column-count: 2;
-  }
+.management-search-field input:focus {
+  outline: none;
+  border-color: var(--cp-border);
+  background: var(--cp-surface);
+  box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.06);
 }
 
-@media (max-width: 767px) {
-  .management-toolbar {
-    align-items: stretch;
+.management-search-submit {
+  height: 36px;
+  border-radius: var(--cp-radius);
+}
+
+.management-search-reset {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  background: var(--cp-surface);
+  color: var(--cp-text-soft);
+  cursor: pointer;
+}
+
+.management-search-reset:hover {
+  background: var(--cp-bg-soft);
+}
+
+.management-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1023px) {
+  .management-workbench {
+    grid-template-columns: 1fr;
   }
 
   .management-search {
@@ -270,20 +289,8 @@ watch(dataVersion, load)
     justify-content: stretch;
   }
 
-  .management-search :deep(.ant-input) {
-    flex: 1;
-    width: auto;
-  }
-}
-
-@media (max-width: 575px) {
-  .management-grid {
-    column-count: 1;
-    column-gap: 14px;
-  }
-
-  .management-grid :deep(.management-card) {
-    margin-bottom: 14px;
+  .management-search-field {
+    max-width: none;
   }
 }
 </style>
