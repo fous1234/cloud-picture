@@ -18,6 +18,9 @@ export interface PageData<T> {
 /** 0 待审核 / 1 已通过 / 2 已拒绝 */
 export type ReviewStatus = 0 | 1 | 2
 
+/** AI 审核结论：PASS 自动通过 / REVIEW 存疑 / BLOCK 拦截 / ERROR 失败 / SKIP 存量跳过 */
+export type AiReviewVerdict = 'PASS' | 'REVIEW' | 'BLOCK' | 'ERROR' | 'SKIP'
+
 /** 0 禁用 / 1 正常 */
 export type UserStatus = 0 | 1
 
@@ -47,6 +50,16 @@ export interface ImageVO {
   ownerId: Id | null
   reviewStatus: ReviewStatus
   reviewMessage: string | null
+  /** 审核人 id：0 = AI 自动审核；人工审核人为雪花 id。
+   *  http 层只给 16 位以上整数补引号，故 AI 哨兵 0 到达时是 number、人工 id 是 string，判定统一用 String(...) */
+  reviewerId: string | number | null
+  /** AI 审核结论；null 表示尚未由 AI 审核（存量图会被后端标为 SKIP） */
+  aiReviewVerdict: AiReviewVerdict | null
+  /** AI 置信度 0-100 */
+  aiReviewConfidence: number | null
+  /** AI 命中违规类别，逗号分隔；空串或 null 表示无标签 */
+  aiReviewLabels: string | null
+  aiReviewTime: string | null
   createTime: string | null
   source: 'LOCAL' | 'PEXELS'
   sourcePageUrl: string | null

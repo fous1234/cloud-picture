@@ -39,21 +39,24 @@ import org.springframework.util.StringUtils;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    /** 服务间内部接口路径，需携带内部令牌，不需要用户会话 */
-    private static final String INTERNAL_PATH = "/user/internal/**";
     private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Token";
 
     private final SessionStore sessionStore;
     private final List<String> publicRequests;
+    /** 服务间内部接口路径（逗号分隔，走 X-Internal-Token 校验），默认仅用户服务内部接口 */
+    private final String[] internalPathPatterns;
     private final String internalToken;
     private final ObjectMapper objectMapper;
 
     public SecurityConfig(SessionStore sessionStore,
                           @Value("${picture.auth.public-requests:}") List<String> publicRequests,
+                          @Value("${picture.internal.paths:/user/internal/**}") List<String> internalPaths,
                           @Value("${picture.internal.token:}") String internalToken,
                           ObjectMapper objectMapper) {
         this.sessionStore = sessionStore;
         this.publicRequests = publicRequests;
+        this.internalPathPatterns = internalPaths == null ? new String[0]
+                : internalPaths.stream().filter(StringUtils::hasText).toArray(String[]::new);
         this.internalToken = internalToken;
         this.objectMapper = objectMapper;
     }
@@ -62,11 +65,14 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
-                        .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD).permitAll()
-                        .requestMatchers(INTERNAL_PATH).access(internalCallAuthorizationManager())
-                        .requestMatchers(buildPublicMatchers()).permitAll()
-                        .anyRequest().authenticated())
+                .authorizeHttpRequests(authorize -> {
+                    authorize.dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD).permitAll();
+                    if (internalPathPatterns.length > 0) {
+                        authorize.requestMatchers(internalPathPatterns).access(internalCallAuthorizationManager());
+                    }
+                    authorize.requestMatchers(buildPublicMatchers()).permitAll()
+                            .anyRequest().authenticated();
+                })
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(unauthenticatedEntryPoint())
                         .accessDeniedHandler(forbiddenHandler()))

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { Id, ImageVO } from '../api/types'
 import { REVIEW_STATUS_TEXT } from '../stores/ui'
 import { formatRelativeTime, formatSize } from '../utils/format'
+import { aiBadge, aiDetail, MINE_PENDING_ETA_TEXT } from '../utils/aiReview'
 
 const props = defineProps<{
   image: ImageVO
@@ -21,6 +22,10 @@ watch(
 const thumbUrl = computed(() => props.image.thumbnailUrl || props.image.url || '')
 const visibleTags = computed(() => (props.image.tags ?? []).slice(0, 3))
 const spec = computed(() => `${(props.image.picFormat || 'IMAGE').toUpperCase()} · ${formatSize(props.image.picSize)}`)
+
+/** 管理端才展示 AI 徽标；无结论/存量 SKIP 时为 null */
+const aiBadgeInfo = computed(() => (props.mode === 'review' ? aiBadge(props.image) : null))
+const aiBadgeTitle = computed(() => (props.mode === 'review' ? aiDetail(props.image)?.title ?? '' : ''))
 
 /** 约分后的比例徽标；约分后仍过大（非常见比例）则不显示 */
 const ratioLabel = computed(() => {
@@ -63,8 +68,20 @@ function gcd(a: number, b: number): number {
       <span class="queue-item-main">
         <span class="queue-item-heading">
           <span class="queue-item-title">{{ image.name || '未命名图片' }}</span>
-          <span class="queue-item-status" :class="`queue-item-status-${image.reviewStatus}`">
-            {{ REVIEW_STATUS_TEXT[image.reviewStatus] }}
+          <span class="queue-item-badges">
+            <span class="queue-item-status" :class="`queue-item-status-${image.reviewStatus}`">
+              {{ REVIEW_STATUS_TEXT[image.reviewStatus] }}
+            </span>
+            <span
+              v-if="aiBadgeInfo"
+              class="queue-item-ai"
+              :class="`queue-item-ai-${aiBadgeInfo.tone}`"
+              :title="aiBadgeTitle"
+              :aria-label="aiBadgeTitle"
+            >{{ aiBadgeInfo.text }}</span>
+            <span v-if="mode === 'mine' && image.reviewStatus === 0" class="queue-item-eta">
+              {{ MINE_PENDING_ETA_TEXT }}
+            </span>
           </span>
         </span>
         <span class="queue-item-sub">
@@ -229,6 +246,55 @@ function gcd(a: number, b: number): number {
   border-color: var(--cp-status-rejected-border);
 }
 
+.queue-item-badges {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.queue-item-ai {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.queue-item-ai-pass {
+  background: var(--cp-status-approved-bg);
+  color: var(--cp-status-approved-fg);
+  border-color: var(--cp-status-approved-border);
+}
+
+.queue-item-ai-block {
+  background: var(--cp-status-rejected-bg);
+  color: var(--cp-status-rejected-fg);
+  border-color: var(--cp-status-rejected-border);
+}
+
+.queue-item-ai-review {
+  background: var(--cp-status-pending-bg);
+  color: var(--cp-status-pending-fg);
+  border-color: var(--cp-status-pending-border);
+}
+
+.queue-item-ai-error {
+  background: var(--cp-bg-soft);
+  color: var(--cp-text-soft);
+  border-color: var(--cp-border);
+}
+
+.queue-item-eta {
+  flex: none;
+  color: var(--cp-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
 .queue-item-sub {
   display: flex;
   align-items: center;
@@ -284,6 +350,10 @@ function gcd(a: number, b: number): number {
 }
 
 @media (max-width: 575px) {
+  .queue-item-heading {
+    flex-wrap: wrap;
+  }
+
   .queue-item-media {
     width: 96px;
     height: 96px;

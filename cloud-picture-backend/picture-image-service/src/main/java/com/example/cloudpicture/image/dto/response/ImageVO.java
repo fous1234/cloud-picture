@@ -26,6 +26,13 @@ public class ImageVO {
     private Long ownerId;
     private Integer reviewStatus;
     private String reviewMessage;
+    /** 审核人 id：0 = AI 自动审核，其余为人工审核人 id */
+    private Long reviewerId;
+    /** AI 审核结论：PASS/REVIEW/BLOCK/ERROR/SKIP，NULL 表示尚未由 AI 审核 */
+    private String aiReviewVerdict;
+    private Integer aiReviewConfidence;
+    private String aiReviewLabels;
+    private LocalDateTime aiReviewTime;
     private LocalDateTime createTime;
     /** 来源：LOCAL 本地上传 / PEXELS 导入 */
     private String source;
@@ -60,6 +67,11 @@ public class ImageVO {
         vo.ownerId = image.getOwnerId();
         vo.reviewStatus = image.getReviewStatus();
         vo.reviewMessage = image.getReviewMessage();
+        vo.reviewerId = image.getReviewerId();
+        vo.aiReviewVerdict = image.getAiReviewVerdict();
+        vo.aiReviewConfidence = image.getAiReviewConfidence();
+        vo.aiReviewLabels = image.getAiReviewLabels();
+        vo.aiReviewTime = image.getAiReviewTime();
         vo.createTime = image.getCreateTime();
         vo.source = image.getSource();
         vo.sourceId = image.getSourceId();

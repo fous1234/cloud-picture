@@ -65,3 +65,9 @@ picture:
   pexels:
     api-key: ${PEXELS_API_KEY:}
     api-base-url: ${PEXELS_API_BASE_URL:https://api.pexels.com/v1}
+  # AI 自动审核：每日凌晨 0 点批量审图；演示时可把 AI_REVIEW_CRON 临时调成高频轮询
+  ai-review:
+    enabled: ${AI_REVIEW_ENABLED:true}
+    cron: ${AI_REVIEW_CRON:0 0 0 * * ?}
+    pass-threshold: ${AI_REVIEW_PASS_THRESHOLD:80}
+    block-threshold: ${AI_REVIEW_BLOCK_THRESHOLD:90}
