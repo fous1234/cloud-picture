@@ -99,7 +99,8 @@ const routes = [
 export const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 }),
+  // 后退/前进时还原离开页面时的滚动位置（配合 DefaultLayout 的 KeepAlive 缓存图库列表），其余导航回顶
+  scrollBehavior: (_to, _from, savedPosition) => savedPosition ?? { top: 0 },
 })
 
 setUnauthorizedHandler(() => {

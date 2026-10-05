@@ -1,21 +1,30 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
 
 /**
  * 面包屑（路径栏）：每级带 to 即可点，最后一级为当前页不可点。
+ * 带 back 的层级按「返回上一级」处理（浏览器后退），用于回到来源页的滚动位置。
  * 全站统一样式，页面只需传 items。
  */
 defineProps<{
-  items: { label: string; to?: RouteLocationRaw }[]
+  items: { label: string; to?: RouteLocationRaw; back?: boolean }[]
 }>()
+
+const router = useRouter()
 </script>
 
 <template>
   <nav class="breadcrumb" aria-label="面包屑">
     <template v-for="(item, index) in items" :key="`${index}-${item.label}`">
       <span v-if="index > 0" class="breadcrumb-sep" aria-hidden="true">/</span>
-      <RouterLink v-if="item.to" class="breadcrumb-link" :to="item.to">{{ item.label }}</RouterLink>
+      <button
+        v-if="item.back"
+        type="button"
+        class="breadcrumb-link breadcrumb-back"
+        @click="router.back()"
+      >{{ item.label }}</button>
+      <RouterLink v-else-if="item.to" class="breadcrumb-link" :to="item.to">{{ item.label }}</RouterLink>
       <span v-else class="breadcrumb-current" aria-current="page">{{ item.label }}</span>
     </template>
   </nav>
@@ -35,6 +44,15 @@ defineProps<{
 .breadcrumb-link {
   color: inherit;
   transition: color 0.15s ease;
+}
+
+/* 按钮形态的层级（back）：外观与链接一致 */
+.breadcrumb-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
 }
 
 .breadcrumb-link:hover {
