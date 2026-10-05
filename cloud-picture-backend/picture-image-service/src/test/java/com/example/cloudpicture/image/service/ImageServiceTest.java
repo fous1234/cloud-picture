@@ -132,6 +132,7 @@ class ImageServiceTest {
         ImageTagMapper imageTagMapper = mock(ImageTagMapper.class);
         CosStorage cosStorage = mock(CosStorage.class);
         Image galleryImage = image(10L, 42L, Image.REVIEW_PASSED);
+        galleryImage.setReviewerId(0L);
         Page<Image> page = new Page<>(1, 12);
         page.setRecords(List.of(galleryImage));
         when(imageMapper.selectPage(any(Page.class), any(Wrapper.class))).thenReturn(page);
@@ -146,6 +147,7 @@ class ImageServiceTest {
         var result = service.pageImages(request);
 
         assertEquals("https://signed-medium", result.getRecords().get(0).getMediumUrl());
+        assertEquals(0L, result.getRecords().get(0).getReviewerId().longValue());
         verify(cosStorage).signedMediumUrl("picture/10.png");
     }
 

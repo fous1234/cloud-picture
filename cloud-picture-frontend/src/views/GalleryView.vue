@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Input, Select, Spin, Tag } from 'ant-design-vue'
+import { Button, FloatButton, Input, Select, Spin, Tag } from 'ant-design-vue'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import type { ImageVO } from '../api/types'
 import { listImages, listTags } from '../api/image'
@@ -449,6 +449,9 @@ const emptyText = computed(() =>
         <span v-else-if="images.length && !hasMore">已加载全部图片</span>
       </div>
     </main>
+
+    <!-- 长列表回到顶部：滚动超过约一屏距离后才出现，平滑回顶 -->
+    <FloatButton.BackTop :visibility-height="600" tooltip="回到顶部" />
   </div>
 </template>
 

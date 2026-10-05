@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Button, Popover, message } from 'ant-design-vue'
 import {
   CheckCircleOutlined,
+  ClockCircleOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
@@ -18,6 +19,7 @@ import { downloadImage } from '../api/image'
 import { errorMessage } from '../api/http'
 import { REVIEW_STATUS_TEXT } from '../stores/ui'
 import { formatDateTime, formatDimensions, formatSize } from '../utils/format'
+import { aiDetail, aiLabels, isAiSource, mineReviewHint } from '../utils/aiReview'
 import ImageSharePanel from './ImageSharePanel.vue'
 
 const props = defineProps<{
@@ -72,6 +74,12 @@ const kicker = computed(() => {
 const canApprove = computed(() => !!props.image && props.image.reviewStatus !== 1)
 const canReject = computed(() => !!props.image && props.image.reviewStatus !== 2)
 const canShare = computed(() => props.image?.reviewStatus === 1)
+
+/** 管理端 AI 结论区：无结论 / 存量 SKIP 时为 null，整块不渲染 */
+const aiDetailInfo = computed(() => (props.mode === 'review' && props.image ? aiDetail(props.image) : null))
+const aiLabelList = computed(() => (props.image ? aiLabels(props.image) : []))
+const aiSourceLabel = computed(() => (props.image && isAiSource(props.image) ? 'AI 自动' : '人工'))
+const mineHint = computed(() => (props.image ? mineReviewHint(props.image) : ''))
 
 watch(
   () => props.image?.id,
@@ -199,12 +207,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <span class="detail-owner-name">{{ image.owner.name || '未知用户' }}</span>
         </div>
 
+        <!-- 用户端审核结果：不含 AI 字样/置信度，也不直出 reviewMessage 原文 -->
         <div
-          v-if="mode === 'mine' && image.reviewStatus === 2 && image.reviewMessage"
-          class="detail-feedback"
+          v-if="mode === 'mine'"
+          class="detail-review-result"
+          :class="`detail-review-result-${image.reviewStatus}`"
         >
-          <ExclamationCircleOutlined />
-          <span>{{ image.reviewMessage }}</span>
+          <ClockCircleOutlined v-if="image.reviewStatus === 0" />
+          <CheckCircleOutlined v-else-if="image.reviewStatus === 1" />
+          <ExclamationCircleOutlined v-else />
+          <span>{{ mineHint }}</span>
         </div>
 
         <p v-if="image.source === 'PEXELS'" class="detail-pexels">
@@ -221,6 +233,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </template>
           <span v-else>图片来源：Pexels</span>
         </p>
+
+        <!-- AI 审核结论区（管理端）：无结论/存量 SKIP 整块不渲染 -->
+        <div v-if="aiDetailInfo" class="detail-ai-review">
+          <div class="detail-ai-head">
+            <span class="detail-ai-badge" :class="`detail-ai-badge-${aiDetailInfo.tone}`">
+              {{ aiDetailInfo.title }}
+            </span>
+            <span class="detail-ai-source">{{ aiSourceLabel }}</span>
+          </div>
+          <div class="detail-ai-metrics">
+            <span v-if="image.aiReviewConfidence !== null">置信度 {{ image.aiReviewConfidence }}%</span>
+            <span v-if="image.aiReviewTime">AI 审核时间 {{ formatDateTime(image.aiReviewTime) }}</span>
+          </div>
+          <div v-if="aiLabelList.length" class="detail-ai-labels">
+            <span v-for="label in aiLabelList" :key="label" class="detail-tag">{{ label }}</span>
+          </div>
+          <p class="detail-ai-note">AI 结论仅供参考，人工审核可随时覆盖</p>
+        </div>
 
         <!-- 审核决策栏 -->
         <div v-if="mode === 'review'" class="detail-decision">
@@ -554,17 +584,110 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   font-weight: 700;
 }
 
-.detail-feedback {
+.detail-review-result {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   padding: 12px;
-  border: 1px solid var(--cp-status-rejected-border);
+  border: 1px solid var(--cp-border);
   border-radius: var(--cp-radius);
-  background: var(--cp-status-rejected-bg);
-  color: var(--cp-status-rejected-fg);
+  background: var(--cp-bg-soft);
+  color: var(--cp-text-soft);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.detail-review-result-1 {
+  border-color: var(--cp-status-approved-border);
+  background: var(--cp-status-approved-bg);
+  color: var(--cp-status-approved-fg);
+}
+
+.detail-review-result-2 {
+  border-color: var(--cp-status-rejected-border);
+  background: var(--cp-status-rejected-bg);
+  color: var(--cp-status-rejected-fg);
+}
+
+.detail-ai-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  background: var(--cp-bg-soft);
+}
+
+.detail-ai-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detail-ai-badge {
+  padding: 2px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.detail-ai-badge-pass {
+  background: var(--cp-status-approved-bg);
+  color: var(--cp-status-approved-fg);
+  border-color: var(--cp-status-approved-border);
+}
+
+.detail-ai-badge-block {
+  background: var(--cp-status-rejected-bg);
+  color: var(--cp-status-rejected-fg);
+  border-color: var(--cp-status-rejected-border);
+}
+
+.detail-ai-badge-review {
+  background: var(--cp-status-pending-bg);
+  color: var(--cp-status-pending-fg);
+  border-color: var(--cp-status-pending-border);
+}
+
+.detail-ai-badge-error {
+  background: var(--cp-surface);
+  color: var(--cp-text-soft);
+  border-color: var(--cp-border);
+}
+
+.detail-ai-source {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-surface);
+  color: var(--cp-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+}
+
+.detail-ai-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--cp-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.detail-ai-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-ai-note {
+  margin: 0;
+  color: var(--cp-text-muted);
+  font-size: 11px;
 }
 
 .detail-pexels {

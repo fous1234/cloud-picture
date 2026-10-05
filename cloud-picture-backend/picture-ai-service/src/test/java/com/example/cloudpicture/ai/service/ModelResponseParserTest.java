@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.example.cloudpicture.ai.dto.response.ImageMetadataVO;
+import com.example.cloudpicture.ai.dto.response.ImageModerationVO;
 import com.example.cloudpicture.common.exception.BusinessException;
 import com.example.cloudpicture.common.exception.ErrorCode;
 import java.util.List;
@@ -90,6 +91,63 @@ class ModelResponseParserTest {
         ImageMetadataVO vo = ModelResponseParser.parse(
                 "{\"introduction\":\"" + overlong + "\",\"tags\":[]}");
         assertEquals(512, vo.getIntroduction().length());
+    }
+
+    @Test
+    void parsesValidModerationVerdict() {
+        ImageModerationVO vo = ModelResponseParser.parseModeration(
+                "{\"verdict\":\"BLOCK\",\"confidence\":95,\"labels\":[\" 色情低俗 \",\"暴力血腥\"]}");
+        assertEquals("BLOCK", vo.getVerdict());
+        assertEquals(95, vo.getConfidence());
+        assertEquals(List.of("色情低俗", "暴力血腥"), vo.getLabels());
+    }
+
+    @Test
+    void parsesPassVerdictWithEmptyLabels() {
+        ImageModerationVO vo = ModelResponseParser.parseModeration(
+                "{\"verdict\":\"PASS\",\"confidence\":88,\"labels\":[]}");
+        assertEquals("PASS", vo.getVerdict());
+        assertEquals(0, vo.getLabels().size());
+    }
+
+    @Test
+    void rejectsInvalidModerationVerdict() {
+        assertModerationUnavailable("{\"verdict\":\"MAYBE\",\"confidence\":50,\"labels\":[]}");
+        assertModerationUnavailable("{\"verdict\":1,\"confidence\":50,\"labels\":[]}");
+    }
+
+    @Test
+    void rejectsMissingOrWrongModerationTypes() {
+        assertModerationUnavailable("{\"confidence\":50,\"labels\":[]}");
+        assertModerationUnavailable("{\"verdict\":\"PASS\",\"labels\":[]}");
+        assertModerationUnavailable("{\"verdict\":\"PASS\",\"confidence\":50}");
+        assertModerationUnavailable("{\"verdict\":\"PASS\",\"confidence\":\"50\",\"labels\":[]}");
+        assertModerationUnavailable("{\"verdict\":\"PASS\",\"confidence\":50,\"labels\":\"色情低俗\"}");
+    }
+
+    @Test
+    void rejectsModerationConfidenceOutOfRange() {
+        assertModerationUnavailable("{\"verdict\":\"PASS\",\"confidence\":-1,\"labels\":[]}");
+        assertModerationUnavailable("{\"verdict\":\"PASS\",\"confidence\":101,\"labels\":[]}");
+    }
+
+    @Test
+    void cleansModerationLabelsAndKeepsAtMostEight() {
+        String labels = "[\" a \",\"\",\"a\",\"b\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\"]";
+        ImageModerationVO vo = ModelResponseParser.parseModeration(
+                "{\"verdict\":\"REVIEW\",\"confidence\":50,\"labels\":" + labels + "}");
+        assertEquals(List.of("a", "b", "1", "2", "3", "4", "5", "6"), vo.getLabels());
+    }
+
+    @Test
+    void rejectsNonTextModerationLabel() {
+        assertModerationUnavailable("{\"verdict\":\"BLOCK\",\"confidence\":95,\"labels\":[1,2]}");
+    }
+
+    private static void assertModerationUnavailable(String content) {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> ModelResponseParser.parseModeration(content));
+        assertEquals(ErrorCode.AI_UNAVAILABLE, ex.getErrorCode());
     }
 
     private static void assertUnavailable(String content) {

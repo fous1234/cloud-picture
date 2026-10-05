@@ -1,6 +1,7 @@
 package com.example.cloudpicture.ai.service;
 
 import com.example.cloudpicture.ai.dto.response.ImageMetadataVO;
+import com.example.cloudpicture.ai.dto.response.ImageModerationVO;
 import com.example.cloudpicture.common.exception.BusinessException;
 import com.example.cloudpicture.common.exception.ErrorCode;
 import com.fasterxml.jackson.core.JsonParser;
@@ -22,6 +23,8 @@ final class ModelResponseParser {
     private static final int MAX_TAG_LENGTH = 32;
     private static final int MAX_TAG_COUNT = 10;
     private static final int MAX_TAGS_TOTAL_LENGTH = 512;
+    private static final int MAX_LABEL_LENGTH = 32;
+    private static final int MAX_LABEL_COUNT = 8;
 
     private ModelResponseParser() {
     }
@@ -38,6 +41,46 @@ final class ModelResponseParser {
             introduction = introduction.substring(0, MAX_INTRODUCTION_LENGTH);
         }
         return new ImageMetadataVO(introduction, cleanTags(tagsNode));
+    }
+
+    static ImageModerationVO parseModeration(String content) {
+        JsonNode root = readObject(content);
+        JsonNode verdictNode = root.get("verdict");
+        JsonNode confidenceNode = root.get("confidence");
+        JsonNode labelsNode = root.get("labels");
+        if (verdictNode == null || !verdictNode.isTextual()
+                || confidenceNode == null || !confidenceNode.isInt()
+                || labelsNode == null || !labelsNode.isArray()) {
+            throw unavailable();
+        }
+        String verdict = verdictNode.asText().trim();
+        if (!"PASS".equals(verdict) && !"REVIEW".equals(verdict) && !"BLOCK".equals(verdict)) {
+            throw unavailable();
+        }
+        int confidence = confidenceNode.asInt();
+        if (confidence < 0 || confidence > 100) {
+            throw unavailable();
+        }
+        return new ImageModerationVO(verdict, confidence, cleanLabels(labelsNode));
+    }
+
+    private static List<String> cleanLabels(JsonNode labelsNode) {
+        List<String> labels = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (JsonNode labelNode : labelsNode) {
+            if (!labelNode.isTextual()) {
+                throw unavailable();
+            }
+            String label = labelNode.asText().trim();
+            if (label.isEmpty() || label.length() > MAX_LABEL_LENGTH || !seen.add(label)) {
+                continue;
+            }
+            if (labels.size() >= MAX_LABEL_COUNT) {
+                break;
+            }
+            labels.add(label);
+        }
+        return labels;
     }
 
     private static List<String> cleanTags(JsonNode tagsNode) {

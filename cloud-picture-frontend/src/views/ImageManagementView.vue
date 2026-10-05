@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { Button } from 'ant-design-vue'
+import { Button, FloatButton } from 'ant-design-vue'
 import { ClockCircleOutlined, CloudDownloadOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
@@ -215,6 +215,9 @@ loadStats()
 
     <ImageManagementReviewPanel v-if="activeTab === 'review'" :stats="reviewStats" />
     <ImageManagementMinePanel v-else :stats="mineStats" @upload="openUpload" />
+
+    <!-- 长列表回到顶部：滚动超过约一屏距离后才出现，平滑回顶 -->
+    <FloatButton.BackTop :visibility-height="600" tooltip="回到顶部" />
   </div>
 </template>
 

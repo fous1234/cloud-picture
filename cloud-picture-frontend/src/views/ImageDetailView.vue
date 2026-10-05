@@ -58,17 +58,30 @@ let downloadRequestSequence = 0
 
 const id = computed(() => String(route.params.id))
 
-/** 来源是图片管理时面包屑走「图片管理 / 我的上传」，否则走「共享图库 / 分类」 */
-const originFromManagement = computed(() => {
-  const back = (window.history.state?.back as string | undefined) ?? ''
-  return back.startsWith('/image-management')
+/** 上一跳地址：用于判断来源，以及「返回上一级」是否可用 */
+const backPath = computed(() => {
+  const back = window.history.state?.back
+  return typeof back === 'string' ? back : ''
 })
 
-const crumbs = computed<{ label: string; to?: RouteLocationRaw }[]>(() => {
-  const trail: { label: string; to?: RouteLocationRaw }[] = []
+/** 来源是图片管理时面包屑走「图片管理 / 我的上传」，否则走「共享图库 / 分类」 */
+const originFromManagement = computed(() => backPath.value.startsWith('/image-management'))
+
+/** 来自图库时面包屑按「返回上一级」处理，回到离开图库时的滚动位置；直接打开（无历史）时退化为普通跳转 */
+const canBackToGallery = computed(
+  () => !originFromManagement.value && backPath.value.startsWith('/gallery'),
+)
+
+type Crumb = { label: string; to?: RouteLocationRaw; back?: boolean }
+
+const crumbs = computed<Crumb[]>(() => {
+  const trail: Crumb[] = []
   if (originFromManagement.value) {
     trail.push({ label: '图片管理', to: { name: 'image-management' } })
     trail.push({ label: '我的上传', to: { name: 'image-management', query: { tab: 'mine' } } })
+  } else if (canBackToGallery.value) {
+    trail.push({ label: '共享图库', back: true })
+    if (image.value?.category) trail.push({ label: image.value.category, back: true })
   } else {
     trail.push({ label: '共享图库', to: { name: 'gallery' } })
     const category = image.value?.category

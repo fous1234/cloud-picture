@@ -20,6 +20,12 @@ public class Image {
     public static final int REVIEW_PASSED = 1;
     public static final int REVIEW_REJECTED = 2;
 
+    public static final String AI_VERDICT_PASS = "PASS";
+    public static final String AI_VERDICT_REVIEW = "REVIEW";
+    public static final String AI_VERDICT_BLOCK = "BLOCK";
+    public static final String AI_VERDICT_ERROR = "ERROR";
+    public static final String AI_VERDICT_SKIP = "SKIP";
+
     public static final String SOURCE_LOCAL = "LOCAL";
     public static final String SOURCE_PEXELS = "PEXELS";
 
@@ -55,6 +61,15 @@ public class Image {
     private Long reviewerId;
 
     private LocalDateTime reviewTime;
+
+    /** AI 审核结论：PASS/REVIEW/BLOCK/ERROR/SKIP，NULL 表示尚未由 AI 审核 */
+    private String aiReviewVerdict;
+
+    private Integer aiReviewConfidence;
+
+    private String aiReviewLabels;
+
+    private LocalDateTime aiReviewTime;
 
     /** 图片来源：LOCAL 本地上传 / PEXELS 图源导入 */
     private String source;
