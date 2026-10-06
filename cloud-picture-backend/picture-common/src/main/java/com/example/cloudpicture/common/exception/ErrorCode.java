@@ -14,6 +14,7 @@ public enum ErrorCode {
     NO_AUTH("NO_AUTH", 403, "无权限"),
     NOT_FOUND("NOT_FOUND", 404, "资源不存在"),
     ACCOUNT_CONFLICT("ACCOUNT_CONFLICT", 409, "账号已存在"),
+    SPACE_EXISTS("SPACE_EXISTS", 409, "私有空间已创建"),
     COS_ERROR("COS_ERROR", 502, "对象存储服务异常"),
     PEXELS_ERROR("PEXELS_ERROR", 502, "Pexels 图源服务异常"),
     AI_UNAVAILABLE("AI_UNAVAILABLE", 503, "AI 服务暂不可用"),

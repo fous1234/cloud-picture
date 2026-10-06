@@ -123,3 +123,46 @@ export interface ImageQuery extends PageQuery {
   randomSeed?: number
   reviewStatus?: ReviewStatus
 }
+
+/** 私有空间：一人一个；无空间时接口返回 null */
+export interface SpaceVO {
+  id: Id
+  name: string
+  imageCount: number
+  totalSize: number
+  createTime: string | null
+}
+
+/** 私有空间图片：无审核、AI 审核、来源、分享相关字段 */
+export interface SpaceImageVO {
+  id: Id
+  /** 短期签名预览地址 */
+  url: string | null
+  /** 带图片处理参数的短期签名缩略图地址 */
+  thumbnailUrl: string | null
+  name: string | null
+  introduction: string | null
+  category: string | null
+  tags: string[] | null
+  picSize: number | null
+  picWidth: number | null
+  picHeight: number | null
+  picFormat: string | null
+  createTime: string | null
+}
+
+/** 管理端空间视图：只有元信息与统计，没有任何图片地址字段 */
+export interface AdminSpaceVO {
+  id: Id
+  name: string
+  imageCount: number
+  totalSize: number
+  createTime: string | null
+  owner: UserBrief | null
+}
+
+export interface SpaceImageQuery extends PageQuery {
+  name?: string
+  category?: string
+  tag?: string
+}

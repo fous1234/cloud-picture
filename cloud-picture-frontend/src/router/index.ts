@@ -66,6 +66,12 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'private-space',
+        name: 'private-space',
+        component: () => import('../views/PrivateSpaceView.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'profile',
         name: 'profile',
         component: () => import('../views/ProfileView.vue'),
@@ -78,6 +84,12 @@ const routes = [
           name: 'image-management',
           query: { ...to.query, tab: 'review' },
         }),
+        meta: { requiresAuth: true, requiresAdmin: true },
+      },
+      {
+        path: 'admin/spaces',
+        name: 'admin-spaces',
+        component: () => import('../views/AdminSpacesView.vue'),
         meta: { requiresAuth: true, requiresAdmin: true },
       },
       {

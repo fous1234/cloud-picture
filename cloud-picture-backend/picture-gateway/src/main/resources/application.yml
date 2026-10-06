@@ -50,3 +50,15 @@ spring:
             - Path=/api/ai/**
           filters:
             - StripPrefix=1
+        - id: picture-image-service-space
+          uri: lb://picture-image-service
+          predicates:
+            - Path=/api/space/**
+          filters:
+            - StripPrefix=1
+        - id: picture-image-service-admin-space
+          uri: lb://picture-image-service
+          predicates:
+            - Path=/api/admin/space/**
+          filters:
+            - StripPrefix=1
