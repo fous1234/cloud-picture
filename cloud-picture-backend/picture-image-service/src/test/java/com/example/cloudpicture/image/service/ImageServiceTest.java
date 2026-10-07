@@ -69,7 +69,7 @@ class ImageServiceTest {
         CurrentUser.set(currentUser);
 
         ImageService imageService = new ImageServiceImpl(imageMapper, imageTagMapper, mock(CosStorage.class),
-                mock(UploaderFiller.class), "10MB");
+                mock(UploaderFiller.class), new ImageFileSupport("10MB"));
         ImageUpdateRequest request = new ImageUpdateRequest();
         request.setId(12L);
         request.setTags(List.of());
@@ -112,7 +112,7 @@ class ImageServiceTest {
         CurrentUser.set(currentUser);
 
         ImageService imageService = new ImageServiceImpl(imageMapper, imageTagMapper, mock(CosStorage.class),
-                mock(UploaderFiller.class), "10MB");
+                mock(UploaderFiller.class), new ImageFileSupport("10MB"));
         ImageQueryRequest request = new ImageQueryRequest();
         request.setCurrent(1);
         request.setSize(12);
@@ -139,7 +139,7 @@ class ImageServiceTest {
         when(cosStorage.signedMediumUrl("picture/10.png")).thenReturn("https://signed-medium");
 
         ImageService service = new ImageServiceImpl(imageMapper, imageTagMapper, cosStorage,
-                mock(UploaderFiller.class), "10MB");
+                mock(UploaderFiller.class), new ImageFileSupport("10MB"));
         ImageQueryRequest request = new ImageQueryRequest();
         request.setCurrent(1);
         request.setSize(12);
@@ -464,7 +464,7 @@ class ImageServiceTest {
 
     private static ImageService service(ImageMapper imageMapper, CosStorage cosStorage) {
         return new ImageServiceImpl(imageMapper, mock(ImageTagMapper.class), cosStorage,
-                mock(UploaderFiller.class), "10MB");
+                mock(UploaderFiller.class), new ImageFileSupport("10MB"));
     }
 
     private static Image image(long id, long ownerId, int reviewStatus) {
@@ -495,7 +495,7 @@ class ImageServiceTest {
         CurrentUser.set(currentUser);
 
         ImageService imageService = new ImageServiceImpl(imageMapper, imageTagMapper, cosStorage,
-                mock(UploaderFiller.class), "10MB");
+                mock(UploaderFiller.class), new ImageFileSupport("10MB"));
         imageService.upload(pngFile(), new ImageUploadRequest());
 
         ArgumentCaptor<Image> captor = ArgumentCaptor.forClass(Image.class);

@@ -31,9 +31,11 @@ watch(
 
 const navLinks = computed(() => {
   const links = [{ name: 'gallery', label: '共享图库' }]
+  links.push({ name: 'private-space', label: '私有空间' })
   links.push({ name: 'image-management', label: '图片管理' })
   if (isAdmin()) {
     links.push({ name: 'admin-users', label: '用户管理' })
+    links.push({ name: 'admin-spaces', label: '空间管理' })
   }
   return links
 })
