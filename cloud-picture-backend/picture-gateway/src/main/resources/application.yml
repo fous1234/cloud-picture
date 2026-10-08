@@ -62,3 +62,15 @@ spring:
             - Path=/api/admin/space/**
           filters:
             - StripPrefix=1
+        - id: picture-payment-service-payment
+          uri: lb://picture-payment-service
+          predicates:
+            - Path=/api/payment/**
+          filters:
+            - StripPrefix=1
+        - id: picture-payment-service-admin-payment
+          uri: lb://picture-payment-service
+          predicates:
+            - Path=/api/admin/payment/**
+          filters:
+            - StripPrefix=1

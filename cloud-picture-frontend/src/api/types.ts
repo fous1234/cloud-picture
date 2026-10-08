@@ -124,12 +124,30 @@ export interface ImageQuery extends PageQuery {
   reviewStatus?: ReviewStatus
 }
 
+/** 私有空间套餐档位；FREE < PRO < MAX */
+export type Tier = 'FREE' | 'PRO' | 'MAX'
+
+/** 订单状态机：UNPAID → PAID / CANCELED / CLOSED */
+export type OrderStatus = 'UNPAID' | 'PAID' | 'CANCELED' | 'CLOSED'
+
+/** 支付通道：由后端 picture.payment.channel 决定 */
+export type OrderChannel = 'MOCK' | 'ALIPAY'
+
 /** 私有空间：一人一个；无空间时接口返回 null */
 export interface SpaceVO {
   id: Id
   name: string
   imageCount: number
   totalSize: number
+  /** 当前生效档位：已过期由后端按 FREE 返回 */
+  tier: Tier
+  tierName: string
+  /** 套餐到期时间；FREE 为 null */
+  tierExpireTime: string | null
+  /** 当前档位的图片数量上限 */
+  imageLimit: number
+  /** 当前档位的容量上限（字节） */
+  sizeLimitBytes: number
   createTime: string | null
 }
 
@@ -165,4 +183,55 @@ export interface SpaceImageQuery extends PageQuery {
   name?: string
   category?: string
   tag?: string
+}
+
+/** 套餐卡片：purchasable / current / badge 由后端给出，前端只做展示与禁用 */
+export interface SpacePlan {
+  tier: Tier
+  name: string
+  imageLimit: number
+  sizeLimitBytes: number
+  /** 价格（分）；FREE 为 0 */
+  priceFen: number
+  /** 有效期天数；FREE 亦为 30，展示时须特判为「永久有效」 */
+  planDays: number
+  purchasable: boolean
+  current: boolean
+  /** 徽标：当前套餐 / 推荐；其余为 null */
+  badge: string | null
+}
+
+export interface PlanList {
+  /** 是否已创建私有空间；未创建时全部套餐不可购买 */
+  spaceCreated: boolean
+  currentTier: Tier
+  currentTierName: string
+  expireTime: string | null
+  plans: SpacePlan[]
+}
+
+/** 支付订单：金额单位为分；tierExpireTime 仅单笔详情在已支付时回填 */
+export interface PaymentOrder {
+  orderNo: string
+  userId: Id
+  tier: Tier
+  tierName: string
+  amountFen: number
+  status: OrderStatus
+  channel: OrderChannel
+  /** 渠道交易号（支付宝 trade_no）；未支付为 null */
+  transactionId: string | null
+  payTime: string | null
+  /** 订单超时时间，超时后由后端懒关单置 CLOSED */
+  expireTime: string | null
+  createTime: string | null
+  tierExpireTime: string | null
+  /** 是否走内置模拟支付（下单/继续支付时返回） */
+  mockPay: boolean
+  /** 支付宝跳转收银台表单（alipay 通道下单/继续支付时返回） */
+  redirectForm: string | null
+}
+
+export interface OrderQuery extends PageQuery {
+  status?: OrderStatus
 }

@@ -14,7 +14,7 @@ import {
 } from '../api/space'
 import { errorMessage } from '../api/http'
 import { CATEGORY_OPTIONS } from '../stores/ui'
-import { formatSize } from '../utils/format'
+import { quotaAlertText, quotaFull } from '../utils/payment'
 import { confirmDeleteSpace, confirmDeleteSpaceImage } from '../utils/spaceActions'
 import AppBreadcrumb from '../components/AppBreadcrumb.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -22,6 +22,7 @@ import ErrorState from '../components/ErrorState.vue'
 import SpaceImageCard from '../components/SpaceImageCard.vue'
 import SpaceImageDetailPanel from '../components/SpaceImageDetailPanel.vue'
 import SpaceImagePreviewModal from '../components/SpaceImagePreviewModal.vue'
+import SpaceQuotaCard from '../components/SpaceQuotaCard.vue'
 import SpaceUploadModal from '../components/SpaceUploadModal.vue'
 
 const DEFAULT_PAGE_SIZE = 12
@@ -52,6 +53,34 @@ function openPreview(image: SpaceImageVO) {
   if (!image.url) return
   previewImage.value = image
   previewOpen.value = true
+}
+
+/** 任一维度到达上限即禁用上传，并把上限文案作为悬浮提示 */
+const uploadDisabled = computed(() => !!space.value && quotaFull(space.value))
+const uploadTip = computed(() =>
+  space.value && quotaFull(space.value) ? quotaAlertText(space.value) : undefined,
+)
+
+function openUpload() {
+  if (space.value && quotaFull(space.value)) {
+    message.warning(quotaAlertText(space.value))
+    return
+  }
+  uploadOpen.value = true
+}
+
+function goPlans() {
+  router.push({ name: 'private-space-plans' })
+}
+
+function goOrders() {
+  router.push({ name: 'private-space-orders' })
+}
+
+/** 后端配额兜底：弹窗里点「去升级套餐」后关闭弹窗并跳套餐页 */
+function onQuotaExceeded() {
+  uploadOpen.value = false
+  goPlans()
 }
 
 const renameOpen = ref(false)
@@ -286,6 +315,25 @@ loadSpace().then(loadList)
   <div class="cp-container cp-page private-space-page">
     <AppBreadcrumb :items="crumbs" />
 
+    <!-- 页面级标题区：私有空间页原先是全站唯一没有 kicker / 页面级标题的页面 -->
+    <div v-if="!spaceLoading && !spaceError" class="space-page-head">
+      <div class="space-page-head-copy">
+        <p class="section-kicker">SECURE PERSONAL REPOSITORY</p>
+        <h1 class="cp-page-title">私有空间</h1>
+        <p class="cp-page-subtitle">只有你能看到这里的图片，免审核且不进共享图库</p>
+      </div>
+      <div class="space-page-head-actions">
+        <span class="space-tier-badge" :class="{ 'is-paid': space && space.tier !== 'FREE' }">
+          {{ space ? space.tierName : '未初始化' }}
+        </span>
+        <span v-if="space" :title="uploadTip">
+          <Button type="primary" :disabled="uploadDisabled" @click="openUpload">
+            上传到私有空间
+          </Button>
+        </span>
+      </div>
+    </div>
+
     <Skeleton v-if="spaceLoading" class="space-skeleton" :paragraph="{ rows: 6 }" active />
 
     <ErrorState
@@ -311,36 +359,13 @@ loadSpace().then(loadList)
     </section>
 
     <template v-else>
-      <!-- 空间头部 -->
-      <section class="space-head">
-        <div class="space-head-main">
-          <div class="space-head-icon" aria-hidden="true">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-              <path d="M12 10v6"></path>
-              <path d="m9 13 3-3 3 3"></path>
-            </svg>
-          </div>
-          <div class="space-head-copy">
-            <div class="space-head-title-row">
-              <h1 class="cp-page-title space-head-title" :title="space.name">{{ space.name }}</h1>
-              <button class="space-rename" type="button" title="修改空间名称" @click="openRename">
-                改名
-              </button>
-            </div>
-            <div class="space-head-meta">
-              <span class="space-stat">
-                <span class="space-stat-dot"></span>
-                共 {{ space.imageCount }} 张 · 占用 {{ formatSize(space.totalSize) }}
-              </span>
-              <button class="space-delete" type="button" @click="onDeleteSpace">删除空间</button>
-            </div>
-          </div>
-        </div>
-        <Button type="primary" class="space-upload-button" @click="uploadOpen = true">
-          上传到私有空间
-        </Button>
-      </section>
+      <SpaceQuotaCard
+        :space="space"
+        @upgrade="goPlans"
+        @orders="goOrders"
+        @rename="openRename"
+        @remove="onDeleteSpace"
+      />
 
       <!-- 隐私说明 -->
       <div class="space-privacy">
@@ -396,7 +421,7 @@ loadSpace().then(loadList)
           />
 
           <EmptyState v-else-if="!images.length" description="私有空间还没有图片">
-            <Button type="primary" @click="uploadOpen = true">上传到私有空间</Button>
+            <Button type="primary" @click="openUpload">上传到私有空间</Button>
           </EmptyState>
 
           <div v-else class="cp-masonry" :class="`space-masonry-${columnCount}`">
@@ -440,7 +465,11 @@ loadSpace().then(loadList)
       </section>
     </template>
 
-    <SpaceUploadModal v-model:open="uploadOpen" @uploaded="loadAll" />
+    <SpaceUploadModal
+      v-model:open="uploadOpen"
+      @uploaded="loadAll"
+      @quota-exceeded="onQuotaExceeded"
+    />
 
     <Modal
       v-model:open="renameOpen"
@@ -493,131 +522,40 @@ loadSpace().then(loadList)
   margin: 16px auto 0;
 }
 
-/* 空间头部 */
-.space-head {
+/* 页面级标题区 */
+.space-page-head {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 20px 24px;
-  border: 1px solid var(--cp-border);
-  border-radius: var(--cp-radius-lg);
-  background: var(--cp-surface);
-  box-shadow: var(--cp-shadow-subtle);
+  gap: 12px;
 }
 
-.space-head-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.space-head-icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  flex: none;
-  border-radius: var(--cp-radius);
-  background: var(--cp-accent);
-  color: #fff;
-}
-
-.space-head-icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.space-head-copy {
-  display: flex;
+.space-page-head-copy {
   min-width: 0;
-  flex-direction: column;
-  gap: 6px;
 }
 
-.space-head-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-.space-head-title {
-  overflow: hidden;
-  margin: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.space-rename {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--cp-text-soft);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.space-rename:hover {
-  border-color: var(--cp-border);
-  background: var(--cp-bg-soft);
-  color: var(--cp-text);
-}
-
-.space-head-meta {
+.space-page-head-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
 }
 
-.space-stat {
+.space-tier-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 10px;
+  padding: 3px 12px;
+  border: 1px solid var(--cp-border);
   border-radius: 999px;
-  background: var(--cp-bg);
+  background: var(--cp-bg-soft);
   color: var(--cp-text-soft);
   font-size: 12px;
-  font-weight: 500;
-}
-
-.space-stat-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: #10b981;
-}
-
-.space-delete {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: #cf1322;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.space-delete:hover {
-  background: var(--cp-status-rejected-bg);
-}
-
-.space-upload-button {
-  align-self: stretch;
-  height: 40px;
-  border-radius: var(--cp-radius);
   font-weight: 600;
+}
+
+.space-tier-badge.is-paid {
+  border-color: var(--cp-accent);
+  background: var(--cp-accent);
+  color: #fff;
 }
 
 /* 隐私说明 */
@@ -799,13 +737,10 @@ loadSpace().then(loadList)
 }
 
 @media (min-width: 576px) {
-  .space-head {
+  .space-page-head {
     flex-direction: row;
     align-items: center;
-  }
-
-  .space-upload-button {
-    align-self: center;
+    justify-content: space-between;
   }
 }
 
