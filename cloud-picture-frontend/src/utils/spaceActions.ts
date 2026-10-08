@@ -24,13 +24,13 @@ export function confirmDeleteSpaceImage(image: SpaceImageVO, onDone?: () => void
   })
 }
 
-/** 删除私有空间的二次确认：有图时必须展示实际张数 */
+/** 删除私有空间的二次确认：有图时必须展示实际张数；删除会同时作废剩余套餐时长 */
 export function confirmDeleteSpace(imageCount: number, onDone?: () => void) {
   Modal.confirm({
     title: '确认删除私有空间？',
     content: imageCount > 0
-      ? `将删除该空间及其中 ${imageCount} 张图片，对象存储中的文件会一并删除，操作不可撤销。`
-      : '该空间没有图片，删除后不可恢复。',
+      ? `将删除该空间及其中 ${imageCount} 张图片，对象存储中的文件会一并删除，并放弃剩余套餐时长，操作不可撤销。`
+      : '该空间没有图片，删除后将放弃剩余套餐时长，且无法恢复。',
     okText: '删除空间',
     okType: 'danger',
     cancelText: '取消',

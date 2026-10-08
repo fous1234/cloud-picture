@@ -18,9 +18,11 @@ import com.example.cloudpicture.image.entity.PrivateSpace;
 import com.example.cloudpicture.image.entity.SpaceImage;
 import com.example.cloudpicture.image.mapper.PrivateSpaceMapper;
 import com.example.cloudpicture.image.mapper.SpaceImageMapper;
+import com.example.cloudpicture.common.tier.TierPlan;
 import com.example.cloudpicture.image.service.CosStorage;
 import com.example.cloudpicture.image.service.ImageFileSupport;
 import com.example.cloudpicture.image.service.SpaceService;
+import com.example.cloudpicture.image.service.TierSupport;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -105,6 +107,7 @@ public class SpaceServiceImpl implements SpaceService {
         if (size == null && imageFileSupport.dimensionReadable(format)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "无法识别图片内容，请上传有效图片");
         }
+        requireWithinQuota(space, file.getSize());
         String cosKey = KEY_PREFIX + UUID.randomUUID().toString().replace("-", "") + "." + format;
         // 内容类型由服务端按扩展名确定，与共享图库上传一致
         cosStorage.upload(file, cosKey, "image/" + ("jpg".equals(format) ? "jpeg" : format));
@@ -203,6 +206,20 @@ public class SpaceServiceImpl implements SpaceService {
                     .eq(SpaceImage::getSpaceId, space.getId()));
         }
         privateSpaceMapper.deleteById(space.getId());
+    }
+
+    /** 配额预检：张数与容量任一超限即拒；放在上传 COS 之前，超限时不产生任何对象 */
+    private void requireWithinQuota(PrivateSpace space, long incomingBytes) {
+        TierPlan plan = TierSupport.currentPlan(space);
+        long[] usage = summarize(space.getId());
+        if (usage[0] + 1 > plan.getImageLimit()) {
+            throw new BusinessException(ErrorCode.SPACE_QUOTA_EXCEEDED,
+                    "当前套餐图片数量已满（上限 " + plan.getImageLimit() + " 张），请升级套餐");
+        }
+        if (usage[1] + incomingBytes > plan.getSizeLimitBytes()) {
+            throw new BusinessException(ErrorCode.SPACE_QUOTA_EXCEEDED,
+                    "当前套餐容量已满（上限 " + plan.getSizeLimitMb() + " MB），请升级套餐");
+        }
     }
 
     /** 空间统计：未删图片数与总大小；is_delete 条件由 @TableLogic 自动补上 */

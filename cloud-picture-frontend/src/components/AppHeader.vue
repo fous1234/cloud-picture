@@ -36,6 +36,7 @@ const navLinks = computed(() => {
   if (isAdmin()) {
     links.push({ name: 'admin-users', label: '用户管理' })
     links.push({ name: 'admin-spaces', label: '空间管理' })
+    links.push({ name: 'admin-payment-orders', label: '订单管理' })
   }
   return links
 })

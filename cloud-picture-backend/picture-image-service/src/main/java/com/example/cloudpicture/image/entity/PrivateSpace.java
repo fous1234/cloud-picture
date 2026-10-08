@@ -20,6 +20,12 @@ public class PrivateSpace {
 
     private String name;
 
+    /** 套餐档位：FREE/PRO/MAX；配额上限由 TierPlan 决定 */
+    private String tier;
+
+    /** 套餐到期时间；FREE 为 null。到期后由定时任务降回 FREE，读时也做一次兜底判断 */
+    private LocalDateTime tierExpireTime;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;

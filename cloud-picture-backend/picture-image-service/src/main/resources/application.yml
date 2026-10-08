@@ -54,6 +54,9 @@ picture:
   internal:
     # 服务间内部接口令牌，调用用户服务时携带 X-Internal-Token
     token: ${INTERNAL_TOKEN:}
+    # 本服务的内部端点（只认 X-Internal-Token，不经网关路由）；
+    # 注意：显式配置后 SecurityConfig 的默认值 /user/internal/** 不再生效，本服务出站调用不受影响
+    paths: /space/internal/**
   cos:
     secret-id: ${COS_SECRET_ID:}
     secret-key: ${COS_SECRET_KEY:}
@@ -71,3 +74,6 @@ picture:
     cron: ${AI_REVIEW_CRON:0 0 0 * * ?}
     pass-threshold: ${AI_REVIEW_PASS_THRESHOLD:80}
     block-threshold: ${AI_REVIEW_BLOCK_THRESHOLD:90}
+  # 私有空间套餐到期降级：每日凌晨 0 点把过期档位写回 FREE，只降档不删图
+  space-tier:
+    expire-cron: ${SPACE_TIER_EXPIRE_CRON:0 0 0 * * ?}

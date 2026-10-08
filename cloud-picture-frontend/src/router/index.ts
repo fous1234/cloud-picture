@@ -72,6 +72,24 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'private-space/plans',
+        name: 'private-space-plans',
+        component: () => import('../views/PrivateSpacePlansView.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'private-space/orders',
+        name: 'private-space-orders',
+        component: () => import('../views/PrivateSpaceOrdersView.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'private-space/orders/:orderNo',
+        name: 'private-space-order-detail',
+        component: () => import('../views/PrivateSpaceOrderDetailView.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'profile',
         name: 'profile',
         component: () => import('../views/ProfileView.vue'),
@@ -90,6 +108,12 @@ const routes = [
         path: 'admin/spaces',
         name: 'admin-spaces',
         component: () => import('../views/AdminSpacesView.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true },
+      },
+      {
+        path: 'admin/payment-orders',
+        name: 'admin-payment-orders',
+        component: () => import('../views/AdminPaymentOrdersView.vue'),
         meta: { requiresAuth: true, requiresAdmin: true },
       },
       {
