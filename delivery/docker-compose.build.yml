@@ -1,0 +1,33 @@
+services:
+  frontend:
+    build:
+      context: ../cloud-picture-frontend
+      dockerfile: Dockerfile
+
+  gateway:
+    build:
+      context: ../cloud-picture-backend
+      dockerfile: Dockerfile
+      args:
+        APP_MODULE: picture-gateway
+
+  user-service:
+    build:
+      context: ../cloud-picture-backend
+      dockerfile: Dockerfile
+      args:
+        APP_MODULE: picture-user-service
+
+  image-service:
+    build:
+      context: ../cloud-picture-backend
+      dockerfile: Dockerfile
+      args:
+        APP_MODULE: picture-image-service
+
+  ai-service:
+    build:
+      context: ../cloud-picture-backend
+      dockerfile: Dockerfile
+      args:
+        APP_MODULE: picture-ai-service

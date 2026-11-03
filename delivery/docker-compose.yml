@@ -1,0 +1,129 @@
+name: cloud-picture-demo
+
+services:
+  frontend:
+    image: cloud-picture/frontend:demo
+    ports:
+      - "127.0.0.1:8088:80"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+  gateway:
+    image: cloud-picture/gateway:demo
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      GATEWAY_PORT: 8080
+      NACOS_ADDR: nacos:8848
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-demo-internal-token}
+    depends_on:
+      - nacos
+    restart: unless-stopped
+
+  user-service:
+    image: cloud-picture/user-service:demo
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      USER_SERVICE_PORT: 8081
+      USER_MYSQL_HOST: mysql
+      USER_MYSQL_PORT: 3306
+      USER_MYSQL_DATABASE: picture_user
+      USER_MYSQL_USERNAME: root
+      USER_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-cloud-picture-demo}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NACOS_ADDR: nacos:8848
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-demo-internal-token}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    restart: unless-stopped
+
+  image-service:
+    image: cloud-picture/image-service:demo
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      IMAGE_SERVICE_PORT: 8082
+      IMAGE_MYSQL_HOST: mysql
+      IMAGE_MYSQL_PORT: 3306
+      IMAGE_MYSQL_DATABASE: picture_image
+      IMAGE_MYSQL_USERNAME: root
+      IMAGE_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-cloud-picture-demo}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NACOS_ADDR: nacos:8848
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-demo-internal-token}
+      COS_SECRET_ID: ${COS_SECRET_ID:-}
+      COS_SECRET_KEY: ${COS_SECRET_KEY:-}
+      COS_REGION: ${COS_REGION:-ap-shanghai}
+      COS_BUCKET: ${COS_BUCKET:-}
+      COS_SIGN_EXPIRE_SECONDS: ${COS_SIGN_EXPIRE_SECONDS:-3600}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      AI_REVIEW_ENABLED: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    restart: unless-stopped
+
+  ai-service:
+    image: cloud-picture/ai-service:demo
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      AI_SERVICE_PORT: 8083
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NACOS_ADDR: nacos:8848
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-demo-internal-token}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+    depends_on:
+      - redis
+      - nacos
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-cloud-picture-demo}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    environment:
+      MODE: standalone
+      TZ: Asia/Shanghai
+    volumes:
+      - nacos-data:/home/nacos/data
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:
+  nacos-data:
