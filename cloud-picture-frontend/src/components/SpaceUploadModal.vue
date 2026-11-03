@@ -24,13 +24,13 @@ import {
 import type { SpaceImageVO } from '../api/types'
 import { generateImageMetadata, type AiImageMetadata } from '../api/ai'
 import { uploadSpaceImage } from '../api/space'
-import { errorMessage, ApiError } from '../api/http'
+import { errorMessage } from '../api/http'
 import { displayTag, normalizeTags, tagsTooLong, validateImageFile } from '../utils/tags'
 import { CATEGORY_OPTIONS } from '../stores/ui'
 import { formatSize } from '../utils/format'
 
 const open = defineModel<boolean>('open', { required: true })
-const emit = defineEmits<{ uploaded: []; quotaExceeded: [] }>()
+const emit = defineEmits<{ uploaded: [] }>()
 
 const formRef = ref<{ validate: () => Promise<unknown> } | null>(null)
 const file = ref<File | null>(null)
@@ -39,8 +39,6 @@ const dragging = ref(false)
 const submitting = ref(false)
 const percent = ref(0)
 const errorText = ref('')
-/** 后端配额兜底：前端预检被绕过时后端返回 SPACE_QUOTA_EXCEEDED，此时给出升级入口 */
-const quotaExceeded = ref(false)
 const uploaded = ref<SpaceImageVO | null>(null)
 const aiMetadata = ref<AiImageMetadata | null>(null)
 const aiLoading = ref(false)
@@ -97,7 +95,6 @@ function clearFile() {
   file.value = null
   percent.value = 0
   errorText.value = ''
-  quotaExceeded.value = false
 }
 
 function revokePreview() {
@@ -199,7 +196,6 @@ async function submit() {
   }
   submitting.value = true
   errorText.value = ''
-  quotaExceeded.value = false
   percent.value = 0
   try {
     uploaded.value = await uploadSpaceImage(
@@ -216,7 +212,6 @@ async function submit() {
     message.success('上传成功，已保存到私有空间')
   } catch (error) {
     errorText.value = errorMessage(error)
-    quotaExceeded.value = error instanceof ApiError && error.code === 'SPACE_QUOTA_EXCEEDED'
   } finally {
     submitting.value = false
   }
@@ -419,11 +414,7 @@ async function submit() {
         show-icon
         message="上传失败"
         :description="errorText + '（已保留所选文件和填写内容，可重试）'"
-      >
-        <template v-if="quotaExceeded" #action>
-          <Button size="small" type="primary" @click="emit('quotaExceeded')">去升级套餐</Button>
-        </template>
-      </Alert>
+      />
     </div>
 
     <template v-if="!uploaded" #footer>

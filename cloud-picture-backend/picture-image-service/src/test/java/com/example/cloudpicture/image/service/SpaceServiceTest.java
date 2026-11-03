@@ -21,7 +21,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.cloudpicture.common.exception.BusinessException;
 import com.example.cloudpicture.common.exception.ErrorCode;
 import com.example.cloudpicture.common.security.context.CurrentUser;
-import com.example.cloudpicture.common.tier.TierPlan;
 import com.example.cloudpicture.image.dto.request.ImageUploadRequest;
 import com.example.cloudpicture.image.dto.request.SpaceCreateRequest;
 import com.example.cloudpicture.image.dto.request.SpaceImageQueryRequest;
@@ -34,7 +33,6 @@ import com.example.cloudpicture.image.mapper.SpaceImageMapper;
 import com.example.cloudpicture.image.service.impl.SpaceServiceImpl;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
@@ -303,101 +301,40 @@ class SpaceServiceTest {
     }
 
     @Test
-    void uploadRejectsWhenImageCountAlreadyAtPlanLimit() throws Exception {
-        PrivateSpaceMapper spaceMapper = mock(PrivateSpaceMapper.class);
-        SpaceImageMapper imageMapper = mock(SpaceImageMapper.class);
-        CosStorage cosStorage = mock(CosStorage.class);
-        PrivateSpace space = space(SPACE_ID, OWNER_ID, "影集");
-        space.setTier(TierPlan.PRO.name());
-        space.setTierExpireTime(LocalDateTime.now().plusDays(1));
-        when(spaceMapper.selectOne(any(Wrapper.class))).thenReturn(space);
-        when(imageMapper.selectMaps(any(Wrapper.class)))
-                .thenReturn(List.of(Map.of("imageCount", (long) TierPlan.PRO.getImageLimit(), "totalSize", 0L)));
-        setCurrentUser(OWNER_ID, CurrentUser.ROLE_USER);
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service(spaceMapper, imageMapper, cosStorage).upload(pngFile(), new ImageUploadRequest()));
-
-        assertEquals(ErrorCode.SPACE_QUOTA_EXCEEDED, error.getErrorCode());
-        // 预检必须在传 COS 之前，超限不能留下任何对象
-        verify(cosStorage, never()).upload(any(MultipartFile.class), anyString(), anyString());
-        verify(imageMapper, never()).insert(any(SpaceImage.class));
-    }
-
-    @Test
-    void uploadRejectsWhenSizeAlreadyAtPlanLimit() throws Exception {
+    void uploadAllowsSpaceAboveFormerCountAndSizeLimits() throws Exception {
         PrivateSpaceMapper spaceMapper = mock(PrivateSpaceMapper.class);
         SpaceImageMapper imageMapper = mock(SpaceImageMapper.class);
         CosStorage cosStorage = mock(CosStorage.class);
         when(spaceMapper.selectOne(any(Wrapper.class))).thenReturn(space(SPACE_ID, OWNER_ID, "影集"));
         when(imageMapper.selectMaps(any(Wrapper.class)))
-                .thenReturn(List.of(Map.of("imageCount", 0L, "totalSize", TierPlan.FREE.getSizeLimitBytes())));
-        setCurrentUser(OWNER_ID, CurrentUser.ROLE_USER);
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service(spaceMapper, imageMapper, cosStorage).upload(pngFile(), new ImageUploadRequest()));
-
-        assertEquals(ErrorCode.SPACE_QUOTA_EXCEEDED, error.getErrorCode());
-        verify(cosStorage, never()).upload(any(MultipartFile.class), anyString(), anyString());
-    }
-
-    @Test
-    void uploadAllowsLastSlotWithinPlanLimit() throws Exception {
-        PrivateSpaceMapper spaceMapper = mock(PrivateSpaceMapper.class);
-        SpaceImageMapper imageMapper = mock(SpaceImageMapper.class);
-        CosStorage cosStorage = mock(CosStorage.class);
-        when(spaceMapper.selectOne(any(Wrapper.class))).thenReturn(space(SPACE_ID, OWNER_ID, "影集"));
-        when(imageMapper.selectMaps(any(Wrapper.class)))
-                .thenReturn(List.of(Map.of("imageCount", (long) TierPlan.FREE.getImageLimit() - 1, "totalSize", 0L)));
+                .thenReturn(List.of(Map.of("imageCount", 1000L, "totalSize", 1024L * 1024 * 1024)));
         setCurrentUser(OWNER_ID, CurrentUser.ROLE_USER);
 
         service(spaceMapper, imageMapper, cosStorage).upload(pngFile(), new ImageUploadRequest());
 
+        verify(cosStorage).upload(any(MultipartFile.class), anyString(), eq("image/png"));
         verify(imageMapper).insert(any(SpaceImage.class));
     }
 
     @Test
-    void uploadTreatsExpiredTierAsFree() throws Exception {
+    void uploadStillRejectsOversizedAndInvalidFilesBeforeCosUpload() {
         PrivateSpaceMapper spaceMapper = mock(PrivateSpaceMapper.class);
         SpaceImageMapper imageMapper = mock(SpaceImageMapper.class);
         CosStorage cosStorage = mock(CosStorage.class);
-        PrivateSpace space = space(SPACE_ID, OWNER_ID, "影集");
-        space.setTier(TierPlan.PRO.name());
-        // 已过期：档位字段还写着 PRO，但读时应按 FREE 判配额
-        space.setTierExpireTime(LocalDateTime.now().minusDays(1));
-        when(spaceMapper.selectOne(any(Wrapper.class))).thenReturn(space);
-        when(imageMapper.selectMaps(any(Wrapper.class)))
-                .thenReturn(List.of(Map.of("imageCount", (long) TierPlan.FREE.getImageLimit(), "totalSize", 0L)));
+        when(spaceMapper.selectOne(any(Wrapper.class))).thenReturn(space(SPACE_ID, OWNER_ID, "影集"));
         setCurrentUser(OWNER_ID, CurrentUser.ROLE_USER);
+        SpaceService spaceService = service(spaceMapper, imageMapper, cosStorage);
+        MultipartFile oversized = mock(MultipartFile.class);
+        when(oversized.getSize()).thenReturn(10L * 1024 * 1024 + 1);
+        MockMultipartFile invalid = new MockMultipartFile("file", "fake.png", "image/png", new byte[]{1, 2, 3});
 
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service(spaceMapper, imageMapper, cosStorage).upload(pngFile(), new ImageUploadRequest()));
-
-        assertEquals(ErrorCode.SPACE_QUOTA_EXCEEDED, error.getErrorCode());
-    }
-
-    @Test
-    void getMineReportsPlanLimitsAndHidesExpiredTier() {
-        PrivateSpaceMapper spaceMapper = mock(PrivateSpaceMapper.class);
-        SpaceImageMapper imageMapper = mock(SpaceImageMapper.class);
-        PrivateSpace space = space(SPACE_ID, OWNER_ID, "影集");
-        space.setTier(TierPlan.MAX.name());
-        space.setTierExpireTime(LocalDateTime.now().plusDays(10));
-        when(spaceMapper.selectOne(any(Wrapper.class))).thenReturn(space);
-        when(imageMapper.selectMaps(any(Wrapper.class))).thenReturn(List.of(Map.of("imageCount", 1L, "totalSize", 10L)));
-        setCurrentUser(OWNER_ID, CurrentUser.ROLE_USER);
-
-        SpaceVO active = service(spaceMapper, imageMapper, mock(CosStorage.class)).getMine();
-        assertEquals(TierPlan.MAX.name(), active.getTier());
-        assertEquals(TierPlan.MAX.getImageLimit(), active.getImageLimit());
-        assertEquals(TierPlan.MAX.getSizeLimitBytes(), active.getSizeLimitBytes());
-        assertEquals(space.getTierExpireTime(), active.getTierExpireTime());
-
-        space.setTierExpireTime(LocalDateTime.now().minusDays(1));
-        SpaceVO expired = service(spaceMapper, imageMapper, mock(CosStorage.class)).getMine();
-        assertEquals(TierPlan.FREE.name(), expired.getTier());
-        assertEquals(TierPlan.FREE.getImageLimit(), expired.getImageLimit());
-        assertNull(expired.getTierExpireTime());
+        for (MultipartFile file : List.of(oversized, invalid)) {
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> spaceService.upload(file, new ImageUploadRequest()));
+            assertEquals(ErrorCode.PARAMS_ERROR, error.getErrorCode());
+        }
+        verify(cosStorage, never()).upload(any(MultipartFile.class), anyString(), anyString());
+        verify(imageMapper, never()).insert(any(SpaceImage.class));
     }
 
     private static SpaceService service(PrivateSpaceMapper spaceMapper, SpaceImageMapper imageMapper,

@@ -14,7 +14,6 @@ import {
 } from '../api/space'
 import { errorMessage } from '../api/http'
 import { CATEGORY_OPTIONS } from '../stores/ui'
-import { quotaAlertText, quotaFull } from '../utils/payment'
 import { confirmDeleteSpace, confirmDeleteSpaceImage } from '../utils/spaceActions'
 import AppBreadcrumb from '../components/AppBreadcrumb.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -22,7 +21,7 @@ import ErrorState from '../components/ErrorState.vue'
 import SpaceImageCard from '../components/SpaceImageCard.vue'
 import SpaceImageDetailPanel from '../components/SpaceImageDetailPanel.vue'
 import SpaceImagePreviewModal from '../components/SpaceImagePreviewModal.vue'
-import SpaceQuotaCard from '../components/SpaceQuotaCard.vue'
+import SpaceSummaryCard from '../components/SpaceSummaryCard.vue'
 import SpaceUploadModal from '../components/SpaceUploadModal.vue'
 
 const DEFAULT_PAGE_SIZE = 12
@@ -55,32 +54,8 @@ function openPreview(image: SpaceImageVO) {
   previewOpen.value = true
 }
 
-/** 任一维度到达上限即禁用上传，并把上限文案作为悬浮提示 */
-const uploadDisabled = computed(() => !!space.value && quotaFull(space.value))
-const uploadTip = computed(() =>
-  space.value && quotaFull(space.value) ? quotaAlertText(space.value) : undefined,
-)
-
 function openUpload() {
-  if (space.value && quotaFull(space.value)) {
-    message.warning(quotaAlertText(space.value))
-    return
-  }
   uploadOpen.value = true
-}
-
-function goPlans() {
-  router.push({ name: 'private-space-plans' })
-}
-
-function goOrders() {
-  router.push({ name: 'private-space-orders' })
-}
-
-/** 后端配额兜底：弹窗里点「去升级套餐」后关闭弹窗并跳套餐页 */
-function onQuotaExceeded() {
-  uploadOpen.value = false
-  goPlans()
 }
 
 const renameOpen = ref(false)
@@ -323,11 +298,8 @@ loadSpace().then(loadList)
         <p class="cp-page-subtitle">只有你能看到这里的图片，免审核且不进共享图库</p>
       </div>
       <div class="space-page-head-actions">
-        <span class="space-tier-badge" :class="{ 'is-paid': space && space.tier !== 'FREE' }">
-          {{ space ? space.tierName : '未初始化' }}
-        </span>
-        <span v-if="space" :title="uploadTip">
-          <Button type="primary" :disabled="uploadDisabled" @click="openUpload">
+        <span v-if="space">
+          <Button type="primary" @click="openUpload">
             上传到私有空间
           </Button>
         </span>
@@ -359,10 +331,8 @@ loadSpace().then(loadList)
     </section>
 
     <template v-else>
-      <SpaceQuotaCard
+      <SpaceSummaryCard
         :space="space"
-        @upgrade="goPlans"
-        @orders="goOrders"
         @rename="openRename"
         @remove="onDeleteSpace"
       />
@@ -468,7 +438,6 @@ loadSpace().then(loadList)
     <SpaceUploadModal
       v-model:open="uploadOpen"
       @uploaded="loadAll"
-      @quota-exceeded="onQuotaExceeded"
     />
 
     <Modal
@@ -538,24 +507,6 @@ loadSpace().then(loadList)
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-}
-
-.space-tier-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 12px;
-  border: 1px solid var(--cp-border);
-  border-radius: 999px;
-  background: var(--cp-bg-soft);
-  color: var(--cp-text-soft);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.space-tier-badge.is-paid {
-  border-color: var(--cp-accent);
-  background: var(--cp-accent);
-  color: #fff;
 }
 
 /* 隐私说明 */

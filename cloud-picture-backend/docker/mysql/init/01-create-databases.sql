@@ -2,4 +2,3 @@
 -- 注意：本脚本只在数据卷为空时执行；已有环境新增库需手动执行同样的 CREATE DATABASE
 CREATE DATABASE IF NOT EXISTS `picture_user` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS `picture_image` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS `picture_payment` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
